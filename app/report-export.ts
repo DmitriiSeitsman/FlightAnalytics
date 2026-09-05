@@ -1,4 +1,5 @@
-import { formatMetric, type FlightMetricKey, type MultiHistogramBin, type StatisticRow, type StatDimension, statDimensionLabels } from "./flight-data";
+import type { Content, TableCell, TDocumentDefinitions } from "pdfmake/interfaces";
+import { formatMetric, metricDefinitions, type FlightMetricKey, type MultiHistogramBin, type StatisticRow, type StatDimension, statDimensionLabels } from "./flight-data";
 import { comparisonRangeSvg, normalizedDistributionSvg, type ChartSeries } from "./histogram";
 
 export type StatisticReport = {
@@ -7,9 +8,11 @@ export type StatisticReport = {
   aircraftFilter: string;
   airportFilter: string;
   dimension: StatDimension;
+  minimumFlights: number;
   metric: FlightMetricKey;
   metricLabel: string;
   metricUnit: string;
+  reportMetrics: FlightMetricKey[];
   selectedIds: string[];
   rows: StatisticRow[];
   bins: MultiHistogramBin[];
@@ -17,8 +20,13 @@ export type StatisticReport = {
   baselineLabel: string;
 };
 
+const NAVY = "#183964";
+const RED = "#d52238";
+const INK = "#14243a";
+const MUTED = "#667580";
 const stamp = (date: Date) => date.toISOString().slice(0, 10);
-const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char] ?? char));
+const metricMeta = (key: FlightMetricKey) => metricDefinitions.find((item) => item.key === key)!;
+const deltaText = (value: number | null, key: FlightMetricKey, withUnit = false) => value === null ? "—" : `${value > 0 ? "+" : ""}${formatMetric(value, key, withUnit)}`;
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -29,59 +37,65 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+const excelHeader = (row: import("exceljs").Row) => {
+  row.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  row.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF183964" } };
+  row.alignment = { vertical: "middle", wrapText: true };
+};
+
 export async function downloadStatisticExcel(report: StatisticReport) {
   const ExcelJS = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Flight Analytics";
-  const sheet = workbook.addWorksheet("Сравнение");
-  const header = ["Объект", "Деталь", "Рейсов", "Мин.", "Медиана", "Среднее", "Макс.", report.baselineLabel, "Отклонение", "Основной"];
-  sheet.addRows([
+  workbook.created = report.generatedAt;
+
+  const info = workbook.addWorksheet("Параметры отчёта");
+  info.addRows([
     ["Flight Analytics — сравнительный отчёт"],
-    [`Файл: ${report.sourceFile || "без имени"}`],
-    [`Сформирован: ${report.generatedAt.toLocaleString("ru-RU")}`],
-    [`Разрез: ${statDimensionLabels[report.dimension]}`],
-    [`Показатель: ${report.metricLabel}, ${report.metricUnit}`],
-    [`Фильтры: тип ВС — ${report.aircraftFilter || "все"}, аэропорт — ${report.airportFilter || "все"}`],
-    [`Участники: ${report.rows.map((row) => row.label).join(", ") || "—"}`],
-    [`Базовая линия: ${report.baselineLabel}${report.dimension === "pilots" ? " рассчитывается отдельно для каждого типа ВС" : ""}`],
-    [],
-    header,
+    ["Исходный файл", report.sourceFile || "без имени"],
+    ["Сформирован", report.generatedAt.toLocaleString("ru-RU")],
+    ["Разрез", statDimensionLabels[report.dimension]],
+    ["Тип ВС", report.aircraftFilter || "все"],
+    ["Аэропорт", report.airportFilter || "все"],
+    ["Минимум рейсов", report.dimension === "pilots" ? report.minimumFlights : "не применяется"],
+    ["Участники", report.rows.map((row) => `${row.label}${row.subtitle ? ` (${row.subtitle})` : ""}`).join("; ") || "—"],
+    ["Показатели", report.reportMetrics.map((key) => metricMeta(key).label).join("; ")],
+    ["Базовая линия", `${report.baselineLabel}${report.dimension === "pilots" ? " рассчитывается отдельно для каждого типа ВС" : ""}`],
   ]);
-  for (const row of report.rows) {
-    const average = row.metrics[report.metric];
-    const baseline = row.baselineMetrics[report.metric];
-    const delta = average !== null && baseline !== null ? average - baseline : null;
-    sheet.addRow([
-      row.label,
-      row.subtitle,
-      row.flights,
-      row.minMetrics[report.metric],
-      row.medianMetrics[report.metric],
-      average,
-      row.maxMetrics[report.metric],
-      baseline,
-      delta,
-      row.id === report.selectedIds[0] ? "да" : "",
-    ]);
-  }
-  sheet.getRow(1).font = { bold: true, size: 14, color: { argb: "FF183964" } };
-  const headerRow = sheet.getRow(10);
-  headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
-  headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF183964" } };
-  sheet.columns = [
-    { width: 28 }, { width: 30 }, { width: 10 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 22 }, { width: 15 }, { width: 11 },
-  ];
-  report.rows.forEach((row, index) => {
-    const color = report.series[index]?.color.replace("#", "").toUpperCase() ?? "183964";
-    sheet.getCell(11 + index, 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${color}` } };
-    sheet.getCell(11 + index, 1).font = { color: { argb: "FFFFFFFF" }, bold: true };
+  info.getRow(1).font = { bold: true, size: 15, color: { argb: "FF183964" } };
+  info.getColumn(1).width = 24;
+  info.getColumn(2).width = 100;
+  for (let row = 2; row <= 10; row += 1) info.getCell(row, 1).font = { bold: true, color: { argb: "FF183964" } };
+  info.eachRow((row) => { row.alignment = { vertical: "top", wrapText: true }; });
+
+  report.reportMetrics.forEach((key, metricIndex) => {
+    const meta = metricMeta(key);
+    const sheetName = `${metricIndex + 1}. ${meta.shortLabel}`.replace(/[\\/*?:[\]]/g, " ").slice(0, 31);
+    const sheet = workbook.addWorksheet(sheetName);
+    sheet.addRow([`${meta.label}, ${meta.unit}`]);
+    sheet.addRow([`Фильтры: тип ВС — ${report.aircraftFilter || "все"}; аэропорт — ${report.airportFilter || "все"}`]);
+    sheet.addRow([]);
+    sheet.addRow(["Объект", "Деталь", "Рейсов", "Мин.", "Медиана", "Среднее", "Макс.", report.baselineLabel, "Отклонение", "Основной"]);
+    excelHeader(sheet.getRow(4));
+    report.rows.forEach((row, index) => {
+      const average = row.metrics[key];
+      const baseline = row.baselineMetrics[key];
+      const delta = average !== null && baseline !== null ? average - baseline : null;
+      sheet.addRow([row.label, row.subtitle, row.flights, row.minMetrics[key], row.medianMetrics[key], average, row.maxMetrics[key], baseline, delta, index === 0 ? "да" : ""]);
+      const color = report.series[index]?.color.replace("#", "").toUpperCase() ?? "183964";
+      sheet.getCell(5 + index, 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${color}` } };
+      sheet.getCell(5 + index, 1).font = { color: { argb: "FFFFFFFF" }, bold: true };
+    });
+    sheet.getRow(1).font = { bold: true, size: 14, color: { argb: "FF183964" } };
+    sheet.columns = [{ width: 28 }, { width: 31 }, { width: 10 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 23 }, { width: 15 }, { width: 11 }];
+    sheet.views = [{ state: "frozen", ySplit: 4, xSplit: 1 }];
   });
 
-  const binsSheet = workbook.addWorksheet("Распределение");
+  const binsSheet = workbook.addWorksheet(`Распределение ${metricMeta(report.metric).shortLabel}`.slice(0, 31));
+  binsSheet.addRow([`Детальный график: ${report.metricLabel}, ${report.metricUnit}`]);
   const distributionHeader = ["От", "До", ...report.series.flatMap((item) => [`${item.label}: рейсов`, `${item.label}: доля`])];
   binsSheet.addRow(distributionHeader);
-  binsSheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
-  binsSheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF183964" } };
+  excelHeader(binsSheet.getRow(2));
   const totals = Object.fromEntries(report.series.map((item) => [item.id, report.bins.reduce((sum, bin) => sum + (bin.counts[item.id] ?? 0), 0)]));
   for (const bin of report.bins) binsSheet.addRow([
     bin.from,
@@ -93,52 +107,98 @@ export async function downloadStatisticExcel(report: StatisticReport) {
   ]);
   binsSheet.columns = distributionHeader.map((_, index) => ({ width: index < 2 ? 14 : 22 }));
   for (let column = 4; column <= distributionHeader.length; column += 2) binsSheet.getColumn(column).numFmt = "0.0%";
+
   const buffer = await workbook.xlsx.writeBuffer();
-  downloadBlob(new Blob([new Uint8Array(buffer as ArrayBuffer)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `flight-analytics-sravnenie-${stamp(report.generatedAt)}.xlsx`);
+  downloadBlob(new Blob([new Uint8Array(buffer as ArrayBuffer)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `flight-analytics-report-${stamp(report.generatedAt)}.xlsx`);
 }
 
-export function printStatisticPdf(report: StatisticReport) {
-  const comparison = comparisonRangeSvg(report.rows, report.metric, report.series, report.baselineLabel);
-  const distribution = normalizedDistributionSvg(report.bins, report.metric, report.series);
-  const legend = report.series.map((item) => `<span><i style="background:${item.color}"></i>${escapeHtml(item.label)}</span>`).join("");
-  const rows = report.rows.map((row, index) => {
-    const average = row.metrics[report.metric];
-    const baseline = row.baselineMetrics[report.metric];
-    const delta = average !== null && baseline !== null ? average - baseline : null;
-    return `<tr${index === 0 ? " class=\"picked\"" : ""}><th><i style="background:${report.series[index]?.color}"></i>${escapeHtml(row.label)}${row.subtitle ? `<small>${escapeHtml(row.subtitle)}</small>` : ""}</th><td>${row.flights}</td><td>${formatMetric(row.minMetrics[report.metric], report.metric)}</td><td>${formatMetric(row.medianMetrics[report.metric], report.metric)}</td><td>${formatMetric(average, report.metric)}</td><td>${formatMetric(row.maxMetrics[report.metric], report.metric)}</td><td>${formatMetric(baseline, report.metric)}</td><td>${formatMetric(delta, report.metric)}</td></tr>`;
-  }).join("");
-  const html = `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"/><title>Сравнение Flight Analytics</title>
-    <style>
-      body { margin: 24px; color: #14243a; font-family: Arial, Helvetica, sans-serif; }
-      h1 { margin: 0; font-size: 22px; } h2 { margin: 16px 0 6px; font-size: 14px; }
-      .meta { color: #667580; font-size: 11px; line-height: 1.55; }
-      .notice { margin: 12px 0; padding: 10px 12px; border: 1px solid #d7dde1; border-radius: 9px; background: #f6f8f9; font-size: 10px; }
-      .legend { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0; font-size: 9px; font-weight: 700; }
-      .legend span { display: inline-flex; align-items: center; gap: 5px; } .legend i, th>i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; border-radius: 50%; }
-      .charts { display: grid; gap: 8px; } svg { max-width: 100%; height: auto; }
-      table { width: 100%; border-collapse: collapse; font-size: 9px; } th, td { padding: 6px; border-bottom: 1px solid #e5e9ea; text-align: right; }
-      th:first-child { text-align: left; } thead th { background: #183964; color: white; } tr.picked td, tr.picked th { background: #fff2f4; }
-      small { display: block; margin-top: 2px; color: #74818a; font-weight: 400; }
-      @page { size: A4 landscape; margin: 10mm; }
-    </style></head><body>
-      <h1>Flight Analytics — сравнительный отчёт</h1>
-      <p class="meta">${escapeHtml(report.sourceFile || "файл без имени")} · ${report.generatedAt.toLocaleString("ru-RU")}<br/>
-      ${escapeHtml(statDimensionLabels[report.dimension])} · ${escapeHtml(report.metricLabel)} (${escapeHtml(report.metricUnit)}) · тип ВС: ${escapeHtml(report.aircraftFilter || "все")} · аэропорт: ${escapeHtml(report.airportFilter || "все")}</p>
-      <div class="notice">${escapeHtml(report.baselineLabel)}${report.dimension === "pilots" ? " рассчитывается отдельно для типа ВС каждого пилота." : "."} Распределение показано в процентах от числа рейсов участника.</div>
-      <div class="legend">${legend}</div>
-      <div class="charts"><h2>Среднее, минимум–максимум и базовая линия</h2>${comparison}<h2>Распределение рейсов, %</h2>${distribution}</div>
-      <table><thead><tr><th>Объект</th><th>Рейсов</th><th>Мин.</th><th>Медиана</th><th>Среднее</th><th>Макс.</th><th>${escapeHtml(report.baselineLabel)}</th><th>Отклонение</th></tr></thead><tbody>${rows}</tbody></table>
-    </body></html>`;
-  const iframe = document.createElement("iframe");
-  iframe.setAttribute("aria-hidden", "true");
-  iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
-  document.body.appendChild(iframe);
-  const doc = iframe.contentDocument;
-  if (!doc) { iframe.remove(); return; }
-  doc.open();
-  doc.write(html);
-  doc.close();
-  const cleanup = () => iframe.remove();
-  iframe.contentWindow?.addEventListener("afterprint", cleanup);
-  window.setTimeout(() => iframe.contentWindow?.print(), 80);
+const pdfHeaderCell = (text: string): TableCell => ({ text, bold: true, color: "#ffffff", fillColor: NAVY, margin: [3, 4, 3, 4] });
+const pdfBodyCell = (text: string | number, options: Partial<TableCell> = {}): TableCell => ({ text, margin: [3, 3, 3, 3], ...options });
+
+export function buildStatisticPdfDocument(report: StatisticReport): TDocumentDefinitions {
+  const metricSections: Content[] = report.reportMetrics.flatMap((key, metricIndex): Content[] => {
+    const meta = metricMeta(key);
+    const body: TableCell[][] = [
+      ["Объект", "Рейсов", "Мин.", "Медиана", "Среднее", "Макс.", report.baselineLabel, "Откл."].map(pdfHeaderCell),
+      ...report.rows.map((row, rowIndex): TableCell[] => {
+        const average = row.metrics[key];
+        const baseline = row.baselineMetrics[key];
+        const delta = average !== null && baseline !== null ? average - baseline : null;
+        return [
+          pdfBodyCell(`${row.label}${row.subtitle ? `\n${row.subtitle}` : ""}`, { bold: true, color: report.series[rowIndex]?.color ?? NAVY, fillColor: rowIndex === 0 ? "#fff2f4" : undefined }),
+          pdfBodyCell(row.flights),
+          pdfBodyCell(formatMetric(row.minMetrics[key], key)),
+          pdfBodyCell(formatMetric(row.medianMetrics[key], key)),
+          pdfBodyCell(formatMetric(average, key), { bold: true }),
+          pdfBodyCell(formatMetric(row.maxMetrics[key], key)),
+          pdfBodyCell(formatMetric(baseline, key)),
+          pdfBodyCell(deltaText(delta, key), { color: delta === null ? MUTED : INK, bold: delta !== null }),
+        ];
+      }),
+    ];
+    return [
+      { text: `${meta.label}, ${meta.unit}`, style: "metricTitle", pageBreak: metricIndex > 0 && metricIndex % 2 === 0 ? "before" : undefined },
+      { table: { headerRows: 1, dontBreakRows: true, widths: [150, 42, "*", "*", "*", "*", 76, 56], body }, layout: "lightHorizontalLines", margin: [0, 0, 0, 10] },
+    ];
+  });
+  const comparison = comparisonRangeSvg(report.rows, report.metric, report.series, report.baselineLabel, 760);
+  const distribution = normalizedDistributionSvg(report.bins, report.metric, report.series, 760, 230);
+  const participants = report.rows.map((row, index) => ({ text: `${index === 0 ? "Основной: " : ""}${row.label}${row.subtitle ? ` · ${row.subtitle}` : ""}`, color: report.series[index]?.color ?? NAVY, bold: index === 0, margin: [0, 2, 0, 2] }));
+
+  return {
+    pageSize: "A4",
+    pageOrientation: "landscape",
+    pageMargins: [30, 30, 30, 34],
+    info: { title: "Flight Analytics — сравнительный отчёт", subject: report.reportMetrics.map((key) => metricMeta(key).label).join(", "), creator: "Flight Analytics" },
+    defaultStyle: { font: "Roboto", fontSize: 8, color: INK },
+    footer: (currentPage, pageCount) => ({ text: `Flight Analytics · ${currentPage} / ${pageCount}`, alignment: "right", color: MUTED, fontSize: 7, margin: [0, 8, 30, 0] }),
+    styles: {
+      title: { fontSize: 19, bold: true, color: NAVY },
+      eyebrow: { fontSize: 7, bold: true, color: RED, characterSpacing: 1.1 },
+      sectionTitle: { fontSize: 13, bold: true, color: NAVY, margin: [0, 13, 0, 6] },
+      metricTitle: { fontSize: 10, bold: true, color: NAVY, margin: [0, 8, 0, 4] },
+      metaLabel: { fontSize: 7, bold: true, color: MUTED },
+      metaValue: { fontSize: 9, bold: true, color: INK },
+    },
+    content: [
+      { text: "АНАЛИТИКА ЛЁТНЫХ ДАННЫХ", style: "eyebrow" },
+      { text: "Flight Analytics — сравнительный отчёт", style: "title", margin: [0, 4, 0, 12] },
+      {
+        columns: [
+          { width: "*", stack: [{ text: "ИСХОДНЫЙ ФАЙЛ", style: "metaLabel" }, { text: report.sourceFile || "без имени", style: "metaValue", margin: [0, 2, 0, 8] }, { text: "РАЗРЕЗ", style: "metaLabel" }, { text: statDimensionLabels[report.dimension], style: "metaValue", margin: [0, 2, 0, 0] }] },
+          { width: "*", stack: [{ text: "ФИЛЬТР ПО ТИПУ ВС", style: "metaLabel" }, { text: report.aircraftFilter || "Все типы", style: "metaValue", margin: [0, 2, 0, 8] }, { text: "ФИЛЬТР ПО АЭРОПОРТУ", style: "metaLabel" }, { text: report.airportFilter || "Все аэропорты", style: "metaValue" }] },
+          { width: "*", stack: [{ text: "СФОРМИРОВАН", style: "metaLabel" }, { text: report.generatedAt.toLocaleString("ru-RU"), style: "metaValue", margin: [0, 2, 0, 8] }, { text: "БАЗОВАЯ ЛИНИЯ", style: "metaLabel" }, { text: `${report.baselineLabel}${report.dimension === "pilots" ? ` отдельно по типу ВС · минимум ${report.minimumFlights} рейс.` : ""}`, style: "metaValue" }] },
+        ],
+        columnGap: 18,
+        margin: [0, 0, 0, 10],
+      },
+      { text: "Участники сравнения", style: "sectionTitle" },
+      { columns: participants, columnGap: 10, margin: [0, 0, 0, 5] },
+      { text: `Показатели отчёта: ${report.reportMetrics.map((key) => metricMeta(key).label).join("; ")}`, color: MUTED, fontSize: 8, margin: [0, 4, 0, 8] },
+      ...metricSections,
+      { text: `Подробные графики · ${report.metricLabel}, ${report.metricUnit}`, style: "sectionTitle", pageBreak: "before" },
+      { text: `Точка — среднее, линия — минимум–максимум, ромб — ${report.baselineLabel.toLocaleLowerCase("ru-RU")}.`, color: MUTED, fontSize: 8, margin: [0, 0, 0, 5] },
+      ...(comparison ? [{ svg: comparison, width: 730, alignment: "center" } as Content] : []),
+      { text: "Распределение рейсов, %", style: "metricTitle", margin: [0, 7, 0, 3] },
+      ...(distribution ? [{ svg: distribution, width: 730, alignment: "center" } as Content] : []),
+      { text: "Доли нормализованы по количеству заполненных значений каждого участника.", color: MUTED, fontSize: 7, margin: [0, 5, 0, 0] },
+    ],
+  };
+}
+
+export async function downloadStatisticPdf(report: StatisticReport) {
+  const [pdfMakeModule, pdfFontsModule] = await Promise.all([
+    import("pdfmake/build/pdfmake"),
+    import("pdfmake/build/vfs_fonts"),
+  ]);
+  const pdfMake = (pdfMakeModule as typeof pdfMakeModule & { default?: typeof pdfMakeModule }).default ?? pdfMakeModule;
+  const fonts = (pdfFontsModule as typeof pdfFontsModule & { default?: typeof pdfFontsModule }).default ?? pdfFontsModule;
+  pdfMake.addVirtualFileSystem(fonts);
+  await new Promise<void>((resolve, reject) => {
+    try {
+      pdfMake.createPdf(buildStatisticPdfDocument(report)).download(`flight-analytics-report-${stamp(report.generatedAt)}.pdf`, resolve);
+    } catch (error) {
+      reject(error);
+    }
+  });
 }

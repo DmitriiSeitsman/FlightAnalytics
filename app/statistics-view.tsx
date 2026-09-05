@@ -13,7 +13,7 @@ import {
   type StatDimension,
 } from "./flight-data";
 import { ComparisonRangeChart, NormalizedDistributionHistogram, SERIES_COLORS, type ChartSeries } from "./histogram";
-import { downloadStatisticExcel, printStatisticPdf } from "./report-export";
+import { downloadStatisticExcel, downloadStatisticPdf } from "./report-export";
 
 const dimensions = Object.entries(statDimensionLabels) as Array<[StatDimension, string]>;
 const MAX_SERIES = SERIES_COLORS.length;
@@ -34,6 +34,7 @@ export function StatisticsView({
   const [primaryId, setPrimaryId] = useState("");
   const [comparisonIds, setComparisonIds] = useState<string[]>([]);
   const [minFlights, setMinFlights] = useState(3);
+  const [reportMetrics, setReportMetrics] = useState<FlightMetricKey[]>(() => metricDefinitions.map((item) => item.key));
   const [exporting, setExporting] = useState<"xlsx" | "pdf" | "">("");
 
   const rows = useMemo(() => buildStatisticRows(flights, dimension, dimension === "pilots" ? minFlights : 1), [dimension, flights, minFlights]);
@@ -67,22 +68,34 @@ export function StatisticsView({
     if (!id || selectedIds.includes(id) || selectedIds.length >= MAX_SERIES) return;
     setComparisonIds((current) => [...current, id]);
   };
-
-  const report = () => ({
-    generatedAt: new Date(),
-    sourceFile,
-    aircraftFilter,
-    airportFilter,
-    dimension,
-    metric,
-    metricLabel: metricMeta.label,
-    metricUnit: metricMeta.unit,
-    selectedIds,
-    rows: selectedRows,
-    bins,
-    series,
-    baselineLabel,
+  const toggleReportMetric = (key: FlightMetricKey) => setReportMetrics((current) => {
+    if (current.includes(key)) return current.length === 1 ? current : current.filter((item) => item !== key);
+    const selected = new Set([...current, key]);
+    return metricDefinitions.map((item) => item.key).filter((item) => selected.has(item));
   });
+
+  const report = () => {
+    const chartMetric = reportMetrics.includes(metric) ? metric : reportMetrics[0];
+    const chartMeta = metricDefinitions.find((item) => item.key === chartMetric)!;
+    const chartDistributions = collectMetricSeries(flights, dimension, selectedIds, chartMetric);
+    return {
+      generatedAt: new Date(),
+      sourceFile,
+      aircraftFilter,
+      airportFilter,
+      dimension,
+      minimumFlights: dimension === "pilots" ? minFlights : 1,
+      metric: chartMetric,
+      metricLabel: chartMeta.label,
+      metricUnit: chartMeta.unit,
+      reportMetrics,
+      selectedIds,
+      rows: selectedRows,
+      bins: multiHistogramBins(chartDistributions),
+      series,
+      baselineLabel,
+    };
+  };
 
   return (
     <div className="stats-panel">
@@ -124,16 +137,29 @@ export function StatisticsView({
         {dimension === "pilots" && <p className="note">Каждый пилот сравнивается со средним именно по своему типу ВС. В данных нет признака PF, поэтому учитываются все рейсы, где пилот входил в экипаж.</p>}
       </section>
 
+      <section className="report-settings" aria-labelledby="report-settings-title">
+        <div className="report-settings-head">
+          <div><span>Состав выгрузки</span><strong id="report-settings-title">Показатели отчёта</strong><small>Отмеченные показатели попадут и в Excel, и в PDF.</small></div>
+          <div><button type="button" onClick={() => setReportMetrics(metricDefinitions.map((item) => item.key))}>Выбрать все</button><button type="button" onClick={() => setReportMetrics([metric])}>Только на экране</button></div>
+        </div>
+        <div className="report-metric-grid">
+          {metricDefinitions.map((item) => <label htmlFor={`report-metric-${item.key}`} key={item.key}>
+            <input id={`report-metric-${item.key}`} aria-label={item.label} type="checkbox" checked={reportMetrics.includes(item.key)} onChange={() => toggleReportMetric(item.key)} />
+            <span><strong>{item.label}</strong><small>{item.unit}</small></span>
+          </label>)}
+        </div>
+      </section>
+
       <div className="export-row">
-        <p className="note">Точка показывает среднее, линия — минимум и максимум, ромб — {baselineLabel.toLocaleLowerCase("ru-RU")}. В распределении доли нормализованы, поэтому пилотов с разным числом рейсов можно сравнивать корректно.</p>
+        <p className="note">В отчёт войдут текущие фильтры, выбранные участники и {reportMetrics.length} из {metricDefinitions.length} показателей. PDF сразу скачается готовым файлом.</p>
         <div className="export-actions">
-          <button type="button" disabled={!selectedRows.length || Boolean(exporting)} onClick={async () => { setExporting("xlsx"); try { await downloadStatisticExcel(report()); } finally { setExporting(""); } }}>
+          <button type="button" disabled={!selectedRows.length || !reportMetrics.length || Boolean(exporting)} onClick={async () => { setExporting("xlsx"); try { await downloadStatisticExcel(report()); } finally { setExporting(""); } }}>
             <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><rect x="1.6" y="1.6" width="12.8" height="12.8" rx="2" fill="none" stroke="currentColor" strokeWidth="1.35"/><path d="M1.6 6h12.8M1.6 10h12.8M6 1.6v12.8" fill="none" stroke="currentColor" strokeWidth="1.2"/><path d="m8.9 6.9 2.4 2.4M11.3 6.9 8.9 9.3" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round"/></svg>
             {exporting === "xlsx" ? "Готовим Excel…" : "Excel"}
           </button>
-          <button type="button" className="ghost" disabled={!selectedRows.length || Boolean(exporting)} onClick={() => { setExporting("pdf"); try { printStatisticPdf(report()); } finally { setExporting(""); } }}>
+          <button type="button" className="ghost" disabled={!selectedRows.length || !reportMetrics.length || Boolean(exporting)} onClick={async () => { setExporting("pdf"); try { await downloadStatisticPdf(report()); } finally { setExporting(""); } }}>
             <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M4 1.5h5.2L13 5.3V14.5H4z" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round"/><path d="M9.2 1.5V5.3H13" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round"/><path d="M6 8.4h4.2M6 10.6h4.2M6 12.7h2.4" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-            PDF
+            {exporting === "pdf" ? "Готовим PDF…" : "Скачать PDF"}
           </button>
         </div>
       </div>
