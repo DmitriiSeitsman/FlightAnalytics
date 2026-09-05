@@ -179,11 +179,11 @@ export function StatisticsView({
         <p className="note">В отчёт войдут текущие фильтры, выбранные участники и {reportMetrics.length} из {metricDefinitions.length} показателей. PDF сразу скачается готовым файлом.</p>
         <div className="export-actions">
           <button type="button" disabled={!selectedRows.length || !reportMetrics.length || Boolean(exporting)} onClick={async () => { setExporting("xlsx"); try { await downloadStatisticExcel(report()); } finally { setExporting(""); } }}>
-            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><rect x="1.6" y="1.6" width="12.8" height="12.8" rx="2" fill="none" stroke="currentColor" strokeWidth="1.35"/><path d="M1.6 6h12.8M1.6 10h12.8M6 1.6v12.8" fill="none" stroke="currentColor" strokeWidth="1.2"/><path d="m8.9 6.9 2.4 2.4M11.3 6.9 8.9 9.3" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round"/></svg>
+            <span className="export-format-icon excel" aria-hidden="true">XLSX</span>
             {exporting === "xlsx" ? "Готовим Excel…" : "Excel"}
           </button>
           <button type="button" className="ghost" disabled={!selectedRows.length || !reportMetrics.length || Boolean(exporting)} onClick={async () => { setExporting("pdf"); try { await downloadStatisticPdf(report()); } finally { setExporting(""); } }}>
-            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M4 1.5h5.2L13 5.3V14.5H4z" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round"/><path d="M9.2 1.5V5.3H13" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round"/><path d="M6 8.4h4.2M6 10.6h4.2M6 12.7h2.4" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+            <span className="export-format-icon pdf" aria-hidden="true">PDF</span>
             {exporting === "pdf" ? "Готовим PDF…" : "Скачать PDF"}
           </button>
         </div>
