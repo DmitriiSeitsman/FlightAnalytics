@@ -14,6 +14,7 @@ import {
 } from "./flight-data";
 import { ComparisonRangeChart, NormalizedDistributionHistogram, SERIES_COLORS, type ChartSeries } from "./histogram";
 import { downloadStatisticExcel, downloadStatisticPdf } from "./report-export";
+import { SearchableSelect, type SearchableOption } from "./searchable-select";
 
 const dimensions = Object.entries(statDimensionLabels) as Array<[StatDimension, string]>;
 const MAX_SERIES = SERIES_COLORS.length;
@@ -30,6 +31,7 @@ export function StatisticsView({
   airportFilter: string;
 }) {
   const [dimension, setDimension] = useState<StatDimension>("pilots");
+  const [statisticsAircraftType, setStatisticsAircraftType] = useState("");
   const [metric, setMetric] = useState<FlightMetricKey>("landingNy");
   const [primaryId, setPrimaryId] = useState("");
   const [comparisonIds, setComparisonIds] = useState<string[]>([]);
@@ -37,12 +39,17 @@ export function StatisticsView({
   const [reportMetrics, setReportMetrics] = useState<FlightMetricKey[]>(() => metricDefinitions.map((item) => item.key));
   const [exporting, setExporting] = useState<"xlsx" | "pdf" | "">("");
 
-  const rows = useMemo(() => buildStatisticRows(flights, dimension, dimension === "pilots" ? minFlights : 1), [dimension, flights, minFlights]);
+  const aircraftTypes = useMemo(() => [...new Set(flights.map((flight) => flight.aircraftType))].sort((left, right) => left.localeCompare(right, "ru")), [flights]);
+  const activeAircraftType = aircraftTypes.includes(statisticsAircraftType) ? statisticsAircraftType : "";
+  const statisticsFlights = useMemo(() => flights.filter((flight) => !activeAircraftType || flight.aircraftType === activeAircraftType), [activeAircraftType, flights]);
+  const rows = useMemo(() => buildStatisticRows(statisticsFlights, dimension, dimension === "pilots" ? minFlights : 1), [dimension, minFlights, statisticsFlights]);
   const activePrimaryId = rows.some((row) => row.id === primaryId) ? primaryId : rows[0]?.id ?? "";
   const activeComparisonIds = comparisonIds.filter((id) => id !== activePrimaryId && rows.some((row) => row.id === id)).slice(0, MAX_SERIES - 1);
   const selectedIds = useMemo(() => activePrimaryId ? [activePrimaryId, ...activeComparisonIds] : [], [activeComparisonIds, activePrimaryId]);
   const selectedRows = useMemo(() => selectedIds.map((id) => rows.find((row) => row.id === id)).filter((row): row is NonNullable<typeof row> => Boolean(row)), [rows, selectedIds]);
   const availableRows = rows.filter((row) => !selectedIds.includes(row.id));
+  const primaryOptions = useMemo<SearchableOption[]>(() => rows.map((row) => ({ value: row.id, label: row.label, detail: row.subtitle || `${row.flights} рейсов`, keywords: `${row.id} ${row.subtitle}` })), [rows]);
+  const comparisonOptions = useMemo<SearchableOption[]>(() => availableRows.map((row) => ({ value: row.id, label: row.label, detail: row.subtitle || `${row.flights} рейсов`, keywords: `${row.id} ${row.subtitle}` })), [availableRows]);
   const metricMeta = metricDefinitions.find((item) => item.key === metric)!;
   const baselineLabel = dimension === "pilots" ? "Среднее по типу ВС" : "Среднее выборки";
   const series = useMemo<ChartSeries[]>(() => selectedRows.map((row, index) => ({
@@ -52,11 +59,16 @@ export function StatisticsView({
     color: SERIES_COLORS[index],
     primary: index === 0,
   })), [selectedRows]);
-  const distributions = useMemo(() => collectMetricSeries(flights, dimension, selectedIds, metric), [dimension, flights, metric, selectedIds]);
+  const distributions = useMemo(() => collectMetricSeries(statisticsFlights, dimension, selectedIds, metric), [dimension, metric, selectedIds, statisticsFlights]);
   const bins = useMemo(() => multiHistogramBins(distributions), [distributions]);
 
   const changeDimension = (next: StatDimension) => {
     setDimension(next);
+    setPrimaryId("");
+    setComparisonIds([]);
+  };
+  const changeAircraftType = (next: string) => {
+    setStatisticsAircraftType(next);
     setPrimaryId("");
     setComparisonIds([]);
   };
@@ -77,11 +89,11 @@ export function StatisticsView({
   const report = () => {
     const chartMetric = reportMetrics.includes(metric) ? metric : reportMetrics[0];
     const chartMeta = metricDefinitions.find((item) => item.key === chartMetric)!;
-    const chartDistributions = collectMetricSeries(flights, dimension, selectedIds, chartMetric);
+    const chartDistributions = collectMetricSeries(statisticsFlights, dimension, selectedIds, chartMetric);
     return {
       generatedAt: new Date(),
       sourceFile,
-      aircraftFilter,
+      aircraftFilter: activeAircraftType || aircraftFilter,
       airportFilter,
       dimension,
       minimumFlights: dimension === "pilots" ? minFlights : 1,
@@ -100,6 +112,12 @@ export function StatisticsView({
   return (
     <div className="stats-panel">
       <div className="pilot-controls stats-controls">
+        <label><span>Тип ВС</span>
+          <select value={activeAircraftType} onChange={(event) => changeAircraftType(event.target.value)}>
+            <option value="">Все типы</option>
+            {aircraftTypes.map((item) => <option value={item} key={item}>{item}</option>)}
+          </select>
+        </label>
         <label><span>Разрез</span>
           <select value={dimension} onChange={(event) => changeDimension(event.target.value as StatDimension)}>
             {dimensions.map(([key, label]) => <option value={key} key={key}>{label}</option>)}
@@ -115,17 +133,24 @@ export function StatisticsView({
 
       <section className="comparison-picker" aria-label="Участники сравнения">
         <div className="comparison-picker-fields">
-          <label><span>Основной {dimension === "pilots" ? "пилот" : "объект"}</span>
-            <select value={activePrimaryId} onChange={(event) => changePrimary(event.target.value)} disabled={!rows.length}>
-              {rows.map((row) => <option value={row.id} key={row.id}>{row.subtitle ? `${row.label} · ${row.subtitle}` : row.label}</option>)}
-            </select>
-          </label>
-          <label><span>Добавить к сравнению</span>
-            <select value="" onChange={(event) => addComparison(event.target.value)} disabled={!availableRows.length || selectedIds.length >= MAX_SERIES}>
-              <option value="">{selectedIds.length >= MAX_SERIES ? `Выбрано максимум: ${MAX_SERIES}` : "Выберите ещё одного или нескольких"}</option>
-              {availableRows.map((row) => <option value={row.id} key={row.id}>{row.subtitle ? `${row.label} · ${row.subtitle}` : row.label}</option>)}
-            </select>
-          </label>
+          <SearchableSelect
+            label={`Основной ${dimension === "pilots" ? "пилот" : "объект"}`}
+            value={activePrimaryId}
+            options={primaryOptions}
+            onChange={changePrimary}
+            placeholder={dimension === "pilots" ? "Введите ФИО или табельный номер" : "Введите название"}
+            emptyText={dimension === "pilots" ? "Пилот не найден" : "Объект не найден"}
+            disabled={!rows.length}
+          />
+          <SearchableSelect
+            label="Добавить к сравнению"
+            value=""
+            options={comparisonOptions}
+            onChange={addComparison}
+            placeholder={selectedIds.length >= MAX_SERIES ? `Выбрано максимум: ${MAX_SERIES}` : "Начните вводить имя"}
+            emptyText={dimension === "pilots" ? "Пилот не найден" : "Объект не найден"}
+            disabled={!availableRows.length || selectedIds.length >= MAX_SERIES}
+          />
         </div>
         {selectedRows.length > 0 && <div className="comparison-chips">
           {selectedRows.map((row, index) => <span className={`comparison-chip${index === 0 ? " primary" : ""}`} style={{ "--series-color": SERIES_COLORS[index] } as React.CSSProperties} key={row.id}>
