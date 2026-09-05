@@ -1,11 +1,21 @@
 import type { ReactNode } from "react";
-import { formatMetric, type FlightMetricKey, type HistogramBin, type StatisticRow } from "./flight-data";
+import { formatMetric, type FlightMetricKey, type HistogramBin, type MultiHistogramBin, type StatisticRow } from "./flight-data";
 
 const NAVY = "#183964";
 const RED = "#d52238";
 const GRID = "#d7e0e6";
 const INK = "#14243a";
 const MUTED = "#74818a";
+
+export const SERIES_COLORS = [RED, NAVY, "#19805b", "#7c3aed", "#d97706"] as const;
+
+export type ChartSeries = {
+  id: string;
+  label: string;
+  subtitle: string;
+  color: string;
+  primary: boolean;
+};
 
 export type ComparisonBar = {
   id: string;
@@ -266,4 +276,181 @@ export function DistributionHistogram({ bins, metric }: { bins: HistogramBin[]; 
       })}
     </ChartFrame>
   );
+}
+
+const rangeDomain = (rows: StatisticRow[], metric: FlightMetricKey) => {
+  const values = rows.flatMap((row) => [row.minMetrics[metric], row.maxMetrics[metric], row.metrics[metric], row.baselineMetrics[metric]])
+    .filter((value): value is number => value !== null);
+  if (!values.length) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min;
+  const padding = span === 0 ? Math.abs(max) * 0.08 || 1 : span * 0.1;
+  return { min: min - padding, max: max + padding };
+};
+
+const compactLabel = (value: string, limit = 24) => value.length > limit ? `${value.slice(0, limit - 1)}…` : value;
+
+export function ComparisonRangeChart({
+  rows,
+  metric,
+  series,
+  baselineLabel,
+}: {
+  rows: StatisticRow[];
+  metric: FlightMetricKey;
+  series: ChartSeries[];
+  baselineLabel: string;
+}) {
+  const domain = rangeDomain(rows, metric);
+  if (!rows.length || !domain) return <p className="note">Недостаточно значений для сравнения.</p>;
+  const width = 920;
+  const rowHeight = 68;
+  const pad = { top: 34, right: 118, bottom: 42, left: 238 };
+  const height = pad.top + pad.bottom + rows.length * rowHeight;
+  const innerWidth = width - pad.left - pad.right;
+  const x = (value: number) => pad.left + ((value - domain.min) / (domain.max - domain.min)) * innerWidth;
+
+  return <div className="chart-scroll range-chart-scroll">
+    <div className="chart-plot" style={{ minWidth: width }}>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Среднее и диапазон значений по выбранным объектам">
+        {ticks(domain.min, domain.max, 5).map((tick) => <g key={tick}>
+          <line x1={x(tick)} x2={x(tick)} y1={pad.top - 8} y2={height - pad.bottom} stroke={GRID} />
+          <text x={x(tick)} y={height - 14} textAnchor="middle" fill={MUTED} fontSize="10">{formatMetric(tick, metric)}</text>
+        </g>)}
+        {rows.map((row, index) => {
+          const meta = series.find((item) => item.id === row.id);
+          const mean = row.metrics[metric];
+          const min = row.minMetrics[metric];
+          const max = row.maxMetrics[metric];
+          const baseline = row.baselineMetrics[metric];
+          const y = pad.top + index * rowHeight + rowHeight / 2;
+          const color = meta?.color ?? NAVY;
+          return <g key={row.id}>
+            {index > 0 && <line x1="12" x2={width - 12} y1={y - rowHeight / 2} y2={y - rowHeight / 2} stroke="#edf0f2" />}
+            <text x={pad.left - 16} y={y - 5} textAnchor="end" fill={INK} fontSize="12" fontWeight={meta?.primary ? 800 : 700}>{compactLabel(row.label)}</text>
+            <text x={pad.left - 16} y={y + 11} textAnchor="end" fill={MUTED} fontSize="9">{compactLabel(row.subtitle || `${row.flights} рейсов`, 34)}</text>
+            {min !== null && max !== null && <>
+              <line x1={x(min)} x2={x(max)} y1={y} y2={y} stroke={color} strokeWidth="5" strokeLinecap="round" opacity=".3" />
+              <circle cx={x(min)} cy={y} r="3" fill={color} opacity=".65" />
+              <circle cx={x(max)} cy={y} r="3" fill={color} opacity=".65" />
+            </>}
+            {baseline !== null && <path d={`M ${x(baseline)} ${y - 7} L ${x(baseline) + 7} ${y} L ${x(baseline)} ${y + 7} L ${x(baseline) - 7} ${y} Z`} fill="white" stroke={color} strokeWidth="2" />}
+            {mean !== null && <circle cx={x(mean)} cy={y} r="7" fill={color} stroke="white" strokeWidth="2"><title>{`${row.label}: среднее ${formatMetric(mean, metric, true)}, ${baselineLabel.toLocaleLowerCase("ru-RU")} ${formatMetric(baseline, metric, true)}`}</title></circle>}
+            <text x={width - pad.right + 16} y={y - 4} fill={color} fontSize="12" fontWeight="800">{formatMetric(mean, metric, true)}</text>
+            <text x={width - pad.right + 16} y={y + 12} fill={MUTED} fontSize="9">{row.flights.toLocaleString("ru-RU")} рейс.</text>
+          </g>;
+        })}
+      </svg>
+    </div>
+  </div>;
+}
+
+export function NormalizedDistributionHistogram({
+  bins,
+  metric,
+  series,
+}: {
+  bins: MultiHistogramBin[];
+  metric: FlightMetricKey;
+  series: ChartSeries[];
+}) {
+  if (!bins.length || !series.length) return <p className="note">Недостаточно значений для распределения.</p>;
+  const totals = Object.fromEntries(series.map((item) => [item.id, bins.reduce((sum, bin) => sum + (bin.counts[item.id] ?? 0), 0)]));
+  const percentages = bins.flatMap((bin) => series.map((item) => totals[item.id] ? ((bin.counts[item.id] ?? 0) / totals[item.id]) * 100 : 0));
+  const maxPercent = Math.max(10, ...percentages);
+  const yMax = Math.ceil(maxPercent / 10) * 10;
+  const width = Math.max(760, bins.length * 112);
+  const height = 238;
+  const pad = { top: 18, right: 18, bottom: 10, left: 52 };
+  const innerWidth = width - pad.left - pad.right;
+  const innerHeight = height - pad.top - pad.bottom;
+  const slot = innerWidth / bins.length;
+  const groupWidth = Math.min(76, slot * 0.76);
+  const barWidth = Math.max(4, groupWidth / series.length - 2);
+
+  return <ChartFrame
+    width={width}
+    height={height}
+    pad={pad}
+    label="Распределение значений выбранных объектов в процентах"
+    axis={bins.map((bin) => ({ key: `${bin.from}-${bin.to}`, title: formatMetric(bin.from, metric), detail: `– ${formatMetric(bin.to, metric)}` }))}
+  >
+    {ticks(0, yMax, 5).map((tick) => {
+      const tickY = pad.top + innerHeight - (tick / yMax) * innerHeight;
+      return <g key={tick}>
+        <line x1={pad.left} x2={width - pad.right} y1={tickY} y2={tickY} stroke={GRID} />
+        <text x={pad.left - 8} y={tickY + 3} textAnchor="end" fill={MUTED} fontSize="10">{Math.round(tick)}%</text>
+      </g>;
+    })}
+    {bins.map((bin, binIndex) => {
+      const startX = pad.left + slot * binIndex + (slot - groupWidth) / 2;
+      return <g key={`${bin.from}-${bin.to}`}>
+        {series.map((item, seriesIndex) => {
+          const count = bin.counts[item.id] ?? 0;
+          const percent = totals[item.id] ? (count / totals[item.id]) * 100 : 0;
+          const barHeight = (percent / yMax) * innerHeight;
+          return <rect
+            key={item.id}
+            x={startX + seriesIndex * (barWidth + 2)}
+            y={pad.top + innerHeight - barHeight}
+            width={barWidth}
+            height={barHeight}
+            rx="3"
+            fill={item.color}
+            opacity={item.primary ? 1 : .82}
+          ><title>{`${item.label}: ${count} рейс. (${percent.toLocaleString("ru-RU", { maximumFractionDigits: 1 })}%) в диапазоне ${formatMetric(bin.from, metric)}–${formatMetric(bin.to, metric)}`}</title></rect>;
+        })}
+      </g>;
+    })}
+  </ChartFrame>;
+}
+
+export function comparisonRangeSvg(rows: StatisticRow[], metric: FlightMetricKey, series: ChartSeries[], baselineLabel: string, width = 860) {
+  const domain = rangeDomain(rows, metric);
+  if (!rows.length || !domain) return "";
+  const rowHeight = 44;
+  const pad = { top: 26, right: 96, bottom: 34, left: 190 };
+  const height = pad.top + pad.bottom + rows.length * rowHeight;
+  const innerWidth = width - pad.left - pad.right;
+  const x = (value: number) => pad.left + ((value - domain.min) / (domain.max - domain.min)) * innerWidth;
+  const grid = ticks(domain.min, domain.max, 5).map((tick) => `<line x1="${x(tick)}" x2="${x(tick)}" y1="${pad.top}" y2="${height - pad.bottom}" stroke="${GRID}"/><text x="${x(tick)}" y="${height - 10}" text-anchor="middle" fill="${MUTED}" font-size="9">${escapeXml(formatMetric(tick, metric))}</text>`).join("");
+  const marks = rows.map((row, index) => {
+    const meta = series.find((item) => item.id === row.id);
+    const color = meta?.color ?? NAVY;
+    const y = pad.top + index * rowHeight + rowHeight / 2;
+    const min = row.minMetrics[metric];
+    const max = row.maxMetrics[metric];
+    const mean = row.metrics[metric];
+    const baseline = row.baselineMetrics[metric];
+    return `<text x="${pad.left - 12}" y="${y + 4}" text-anchor="end" fill="${INK}" font-size="10" font-weight="700">${escapeXml(compactLabel(row.label, 26))}</text>
+      ${min !== null && max !== null ? `<line x1="${x(min)}" x2="${x(max)}" y1="${y}" y2="${y}" stroke="${color}" stroke-width="5" stroke-linecap="round" opacity=".3"/>` : ""}
+      ${baseline !== null ? `<path d="M ${x(baseline)} ${y - 6} L ${x(baseline) + 6} ${y} L ${x(baseline)} ${y + 6} L ${x(baseline) - 6} ${y} Z" fill="white" stroke="${color}" stroke-width="2"/>` : ""}
+      ${mean !== null ? `<circle cx="${x(mean)}" cy="${y}" r="6" fill="${color}" stroke="white" stroke-width="2"/><text x="${width - pad.right + 12}" y="${y + 4}" fill="${color}" font-size="10" font-weight="700">${escapeXml(formatMetric(mean, metric, true))}</text>` : ""}`;
+  }).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Среднее, диапазон и ${escapeXml(baselineLabel.toLocaleLowerCase("ru-RU"))}"><rect width="${width}" height="${height}" fill="#fff"/>${grid}${marks}</svg>`;
+}
+
+export function normalizedDistributionSvg(bins: MultiHistogramBin[], metric: FlightMetricKey, series: ChartSeries[], width = 860, height = 250) {
+  if (!bins.length || !series.length) return "";
+  const totals = Object.fromEntries(series.map((item) => [item.id, bins.reduce((sum, bin) => sum + (bin.counts[item.id] ?? 0), 0)]));
+  const maxPercent = Math.max(10, ...bins.flatMap((bin) => series.map((item) => totals[item.id] ? ((bin.counts[item.id] ?? 0) / totals[item.id]) * 100 : 0)));
+  const yMax = Math.ceil(maxPercent / 10) * 10;
+  const pad = { top: 18, right: 16, bottom: 48, left: 46 };
+  const innerWidth = width - pad.left - pad.right;
+  const innerHeight = height - pad.top - pad.bottom;
+  const slot = innerWidth / bins.length;
+  const groupWidth = Math.min(70, slot * .75);
+  const barWidth = Math.max(3, groupWidth / series.length - 2);
+  const grid = ticks(0, yMax, 5).map((tick) => { const y = pad.top + innerHeight - (tick / yMax) * innerHeight; return `<line x1="${pad.left}" x2="${width - pad.right}" y1="${y}" y2="${y}" stroke="${GRID}"/><text x="${pad.left - 7}" y="${y + 3}" text-anchor="end" fill="${MUTED}" font-size="9">${Math.round(tick)}%</text>`; }).join("");
+  const bars = bins.map((bin, binIndex) => {
+    const startX = pad.left + slot * binIndex + (slot - groupWidth) / 2;
+    const columns = series.map((item, seriesIndex) => {
+      const percent = totals[item.id] ? ((bin.counts[item.id] ?? 0) / totals[item.id]) * 100 : 0;
+      const h = (percent / yMax) * innerHeight;
+      return `<rect x="${startX + seriesIndex * (barWidth + 2)}" y="${pad.top + innerHeight - h}" width="${barWidth}" height="${h}" rx="2" fill="${item.color}" opacity="${item.primary ? 1 : .82}"/>`;
+    }).join("");
+    return `${columns}<text x="${pad.left + slot * binIndex + slot / 2}" y="${height - 24}" text-anchor="middle" fill="${INK}" font-size="8">${escapeXml(formatMetric(bin.from, metric))}</text><text x="${pad.left + slot * binIndex + slot / 2}" y="${height - 12}" text-anchor="middle" fill="${MUTED}" font-size="7">– ${escapeXml(formatMetric(bin.to, metric))}</text>`;
+  }).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img"><rect width="${width}" height="${height}" fill="#fff"/>${grid}${bars}</svg>`;
 }

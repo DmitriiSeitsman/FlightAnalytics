@@ -22,6 +22,12 @@ const presentNumbers = (values: Array<number | null>) => values.filter((item): i
 const average = (values: Array<number | null>) => { const present = presentNumbers(values); return present.length ? present.reduce((sum, item) => sum + item, 0) / present.length : null; };
 const minimum = (values: Array<number | null>) => { const present = presentNumbers(values); return present.length ? Math.min(...present) : null; };
 const maximum = (values: Array<number | null>) => { const present = presentNumbers(values); return present.length ? Math.max(...present) : null; };
+const median = (values: Array<number | null>) => {
+  const present = presentNumbers(values).sort((left, right) => left - right);
+  if (!present.length) return null;
+  const middle = Math.floor(present.length / 2);
+  return present.length % 2 ? present[middle] : (present[middle - 1] + present[middle]) / 2;
+};
 const uniqueAverage = (values: Array<number | null>) => average([...new Set(values.filter((item): item is number => item !== null))]);
 const airport = (value: unknown) => { const clean = text(value).replace(/\s+/g, " ").toLocaleLowerCase("ru-RU"); return clean ? clean.charAt(0).toLocaleUpperCase("ru-RU") + clean.slice(1) : "Не указан"; };
 const aircraftType = (value: unknown) => {
@@ -49,11 +55,12 @@ const metricSet = (items: Flight[]) => {
   return {
     metrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, average(values(key))])) as Metrics,
     minMetrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, minimum(values(key))])) as Metrics,
+    medianMetrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, median(values(key))])) as Metrics,
     maxMetrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, maximum(values(key))])) as Metrics,
   };
 };
 
-export type Summary = { label: string; flights: number; metrics: Metrics; minMetrics: Metrics; maxMetrics: Metrics };
+export type Summary = { label: string; flights: number; metrics: Metrics; minMetrics: Metrics; medianMetrics: Metrics; maxMetrics: Metrics };
 export function summarizeFlights(flights: Flight[], groupBy: "aircraftType" | "departure" | "arrival"): Summary[] {
   const groups = new Map<string, Flight[]>();
   flights.forEach((flight) => groups.set(flight[groupBy], [...(groups.get(flight[groupBy]) ?? []), flight]));
@@ -82,7 +89,9 @@ export type StatisticRow = {
   flights: number;
   metrics: Metrics;
   minMetrics: Metrics;
+  medianMetrics: Metrics;
   maxMetrics: Metrics;
+  baselineMetrics: Metrics;
 };
 
 export function buildStatisticRows(flights: Flight[], dimension: StatDimension, minFlights = 1): StatisticRow[] {
@@ -94,9 +103,12 @@ export function buildStatisticRows(flights: Flight[], dimension: StatDimension, 
       flights: pilot.flights,
       metrics: pilot.metrics,
       minMetrics: pilot.minMetrics,
+      medianMetrics: pilot.medianMetrics,
       maxMetrics: pilot.maxMetrics,
+      baselineMetrics: pilot.typeMetrics,
     }));
   }
+  const baselineMetrics = metricSet(flights).metrics;
   return summarizeFlights(flights, dimension).map((row) => ({
     id: row.label,
     label: row.label,
@@ -104,7 +116,9 @@ export function buildStatisticRows(flights: Flight[], dimension: StatDimension, 
     flights: row.flights,
     metrics: row.metrics,
     minMetrics: row.minMetrics,
+    medianMetrics: row.medianMetrics,
     maxMetrics: row.maxMetrics,
+    baselineMetrics,
   }));
 }
 
@@ -122,6 +136,21 @@ export function collectMetricValues(flights: Flight[], dimension: StatDimension,
   return { selected, others };
 }
 
+export function collectMetricSeries(flights: Flight[], dimension: StatDimension, ids: string[], metric: FlightMetricKey) {
+  const series = Object.fromEntries(ids.map((id) => [id, [] as number[]])) as Record<string, number[]>;
+  for (const flight of flights) {
+    const value = flight.metrics[metric];
+    if (value === null) continue;
+    for (const id of ids) {
+      const match = dimension === "pilots"
+        ? flight.crew.some((member) => `${member.role}:${member.code}:${flight.aircraftType}` === id)
+        : flight[dimension] === id;
+      if (match) series[id].push(value);
+    }
+  }
+  return series;
+}
+
 const niceStep = (span: number, bins: number) => {
   const raw = span / Math.max(1, bins);
   const magnitude = 10 ** Math.floor(Math.log10(raw || 1));
@@ -131,6 +160,7 @@ const niceStep = (span: number, bins: number) => {
 };
 
 export type HistogramBin = { from: number; to: number; selected: number; others: number };
+export type MultiHistogramBin = { from: number; to: number; counts: Record<string, number> };
 
 export function histogramBins(selected: number[], others: number[], binCount = 8): HistogramBin[] {
   const all = [...selected, ...others];
@@ -156,6 +186,29 @@ export function histogramBins(selected: number[], others: number[], binCount = 8
   others.forEach((value) => place(value, "others"));
   return bins;
 }
+
+export function multiHistogramBins(series: Record<string, number[]>, binCount = 8): MultiHistogramBin[] {
+  const entries = Object.entries(series);
+  const all = entries.flatMap(([, values]) => values);
+  if (!all.length) return [];
+  const min = Math.min(...all);
+  const max = Math.max(...all);
+  if (min === max) return [{ from: min, to: max, counts: Object.fromEntries(entries.map(([id, values]) => [id, values.length])) }];
+  const step = niceStep(max - min, binCount);
+  const start = Math.floor(min / step) * step;
+  const end = Math.max(start + step, Math.ceil(max / step) * step);
+  const count = Math.max(1, Math.round((end - start) / step));
+  const bins: MultiHistogramBin[] = Array.from({ length: count }, (_, index) => ({
+    from: start + index * step,
+    to: start + (index + 1) * step,
+    counts: Object.fromEntries(entries.map(([id]) => [id, 0])),
+  }));
+  for (const [id, values] of entries) for (const value of values) {
+    const index = Math.min(count - 1, Math.max(0, Math.floor((value - start) / step)));
+    bins[index].counts[id] += 1;
+  }
+  return bins;
+}
 export type PilotSummary = {
   code: string;
   name: string;
@@ -164,6 +217,7 @@ export type PilotSummary = {
   flights: number;
   metrics: Metrics;
   minMetrics: Metrics;
+  medianMetrics: Metrics;
   maxMetrics: Metrics;
   typeMetrics: Metrics;
 };
@@ -184,6 +238,7 @@ export function summarizePilots(flights: Flight[]): PilotSummary[] {
       flights: items.length,
       metrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, average(values(key))])) as Metrics,
       minMetrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, minimum(values(key))])) as Metrics,
+      medianMetrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, median(values(key))])) as Metrics,
       maxMetrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, maximum(values(key))])) as Metrics,
       typeMetrics: baselines.get(aircraftType)!,
     };

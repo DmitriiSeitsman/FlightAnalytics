@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildStatisticRows, histogramBins, summarizePilots, type Flight } from "../app/flight-data.ts";
+import { buildStatisticRows, collectMetricSeries, histogramBins, multiHistogramBins, summarizePilots, type Flight } from "../app/flight-data.ts";
 
 function flight(overrides: Partial<Omit<Flight, "metrics">> & Pick<Flight, "key" | "crew"> & { metrics?: Partial<Flight["metrics"]> }): Flight {
   const base: Flight = {
@@ -72,6 +72,7 @@ test("summarizePilots keeps min, average and max for each metric", () => {
   assert.equal(pilots.length, 1);
   assert.equal(pilots[0].flights, 3);
   assert.equal(pilots[0].minMetrics.landingNy, 1.1);
+  assert.equal(pilots[0].medianMetrics.landingNy, 1.3);
   assert.ok(pilots[0].metrics.landingNy !== null);
   assert.ok(Math.abs(pilots[0].metrics.landingNy - (1.1 + 1.4 + 1.3) / 3) < 1e-12);
   assert.equal(pilots[0].maxMetrics.landingNy, 1.4);
@@ -79,6 +80,33 @@ test("summarizePilots keeps min, average and max for each metric", () => {
   assert.equal(pilots[0].maxMetrics.takeoffPitch, 12);
   assert.equal(pilots[0].minMetrics.reverseOffSpeed, 50);
   assert.equal(pilots[0].maxMetrics.reverseOffSpeed, 70);
+});
+
+test("pilot statistics use a separate aircraft-type baseline", () => {
+  const flights = [
+    flight({ key: "a1", crew: [{ role: "КВС", name: "Иванов", code: "100" }], aircraftType: "A-319/320", metrics: { landingNy: 1.1 } }),
+    flight({ key: "a2", crew: [{ role: "КВС", name: "Петров", code: "200" }], aircraftType: "A-319/320", metrics: { landingNy: 1.3 } }),
+    flight({ key: "b1", crew: [{ role: "КВС", name: "Сидоров", code: "300" }], aircraftType: "B-737", metrics: { landingNy: 1.7 } }),
+    flight({ key: "b2", crew: [{ role: "КВС", name: "Козлов", code: "400" }], aircraftType: "B-737", metrics: { landingNy: 1.9 } }),
+  ];
+  const rows = buildStatisticRows(flights, "pilots");
+  const airbus = rows.find((row) => row.id === "КВС:100:A-319/320");
+  const boeing = rows.find((row) => row.id === "КВС:300:B-737");
+  assert.ok(airbus?.baselineMetrics.landingNy !== null && Math.abs(airbus.baselineMetrics.landingNy - 1.2) < 1e-12);
+  assert.ok(boeing?.baselineMetrics.landingNy !== null && Math.abs(boeing.baselineMetrics.landingNy - 1.8) < 1e-12);
+});
+
+test("multi-series histogram preserves each selected pilot's flights", () => {
+  const flights = [
+    flight({ key: "1", crew: [{ role: "КВС", name: "Иванов", code: "100" }], metrics: { landingNy: 1.1 } }),
+    flight({ key: "2", crew: [{ role: "КВС", name: "Иванов", code: "100" }], metrics: { landingNy: 1.5 } }),
+    flight({ key: "3", crew: [{ role: "КВС", name: "Петров", code: "200" }], metrics: { landingNy: 1.3 } }),
+  ];
+  const ids = ["КВС:100:A-319/320", "КВС:200:A-319/320"];
+  const series = collectMetricSeries(flights, "pilots", ids, "landingNy");
+  const bins = multiHistogramBins(series, 4);
+  assert.equal(bins.reduce((sum, bin) => sum + bin.counts[ids[0]], 0), 2);
+  assert.equal(bins.reduce((sum, bin) => sum + bin.counts[ids[1]], 0), 1);
 });
 
 test("buildStatisticRows and histogramBins compare a selected group with others", () => {
