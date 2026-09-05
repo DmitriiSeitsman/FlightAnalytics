@@ -179,11 +179,15 @@ export function StatisticsView({
         <p className="note">В отчёт войдут текущие фильтры, выбранные участники и {reportMetrics.length} из {metricDefinitions.length} показателей. PDF сразу скачается готовым файлом.</p>
         <div className="export-actions">
           <button type="button" disabled={!selectedRows.length || !reportMetrics.length || Boolean(exporting)} onClick={async () => { setExporting("xlsx"); try { await downloadStatisticExcel(report()); } finally { setExporting(""); } }}>
-            <span className="export-format-icon excel" aria-hidden="true">XLSX</span>
+            <span className="export-format-icon excel" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 10h17M3.5 14.75h17M10 4.5v15M15.25 10v9.5"/></svg>
+            </span>
             {exporting === "xlsx" ? "Готовим Excel…" : "Excel"}
           </button>
           <button type="button" className="ghost" disabled={!selectedRows.length || !reportMetrics.length || Boolean(exporting)} onClick={async () => { setExporting("pdf"); try { await downloadStatisticPdf(report()); } finally { setExporting(""); } }}>
-            <span className="export-format-icon pdf" aria-hidden="true">PDF</span>
+            <span className="export-format-icon pdf" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M6 3.5h8l4 4v13H6z"/><path d="M14 3.5v4h4M9 12.5h6M9 16h6"/></svg>
+            </span>
             {exporting === "pdf" ? "Готовим PDF…" : "Скачать PDF"}
           </button>
         </div>
