@@ -18,7 +18,10 @@ export type ImportResult = { flights: Flight[]; sourceRows: number; duplicatesRe
 const required = ["ID_Poleta", "Nazvanie_Aeroporta_Vzleta", "Nazvanie_Aeroporta_Posadki", "FIO_KVS", "Kod_KVS", "FIO_2P", "Kod_2P", "Bort", "Tip_VS", "Reys", "Data_Poleta", "Vremya_Vzleta", "Vremya_Posadki", "Tangazh_Pri_Otrive", "Eshelon_1", "Skorost_Vhoda_V_Glissadu", "Visota_Otklyucheniya_Avtopilota", "Rasstoyanie_proleta_ot_torca_VPP_do_kasaniya", "Vremya_proleta_ot_torca_VPP_do_kasaniya", "Vertikalnaya_Peregruzka_Na_Posadke", "Skorost_Viklyucheniya_Reversa"];
 const text = (value: unknown): string => { if (value == null) return ""; if (value instanceof Date) return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }).format(value); if (typeof value === "object") { const item = value as { text?: unknown; result?: unknown; richText?: Array<{ text?: unknown }> }; if (item.text !== undefined) return text(item.text); if (item.result !== undefined) return text(item.result); if (item.richText) return item.richText.map((part) => text(part.text)).join("").trim(); } return String(value).trim(); };
 const number = (value: unknown) => { if (typeof value === "number") return Number.isFinite(value) ? value : null; const source = text(value); const parsed = Number(source.replace(/\s/g, "").replace(",", ".")); return source && Number.isFinite(parsed) ? parsed : null; };
-const average = (values: Array<number | null>) => { const present = values.filter((item): item is number => item !== null && Number.isFinite(item)); return present.length ? present.reduce((sum, item) => sum + item, 0) / present.length : null; };
+const presentNumbers = (values: Array<number | null>) => values.filter((item): item is number => item !== null && Number.isFinite(item));
+const average = (values: Array<number | null>) => { const present = presentNumbers(values); return present.length ? present.reduce((sum, item) => sum + item, 0) / present.length : null; };
+const minimum = (values: Array<number | null>) => { const present = presentNumbers(values); return present.length ? Math.min(...present) : null; };
+const maximum = (values: Array<number | null>) => { const present = presentNumbers(values); return present.length ? Math.max(...present) : null; };
 const uniqueAverage = (values: Array<number | null>) => average([...new Set(values.filter((item): item is number => item !== null))]);
 const airport = (value: unknown) => { const clean = text(value).replace(/\s+/g, " ").toLocaleLowerCase("ru-RU"); return clean ? clean.charAt(0).toLocaleUpperCase("ru-RU") + clean.slice(1) : "Не указан"; };
 const aircraftType = (value: unknown) => {
@@ -41,6 +44,148 @@ export function parseFlightRows(rows: SheetRow[], headers: string[]): ImportResu
   const flights = [...groups.entries()].map(([key, group]): Flight => { if (group.length > 1) duplicateGroups += 1; const rowMetrics = group.map(metrics); if (group.length > 1 && metricDefinitions.some(({ key: metric }) => new Set(rowMetrics.map((item) => item[metric]).filter((item) => item !== null)).size > 1)) conflicts += 1; const representative = group.reduce((best, row) => Object.values(metrics(row)).filter((item) => item !== null).length > Object.values(metrics(best)).filter((item) => item !== null).length ? row : best); return { key, aircraftType: aircraftType(representative.Tip_VS), departure: airport(representative.Nazvanie_Aeroporta_Vzleta), arrival: airport(representative.Nazvanie_Aeroporta_Posadki), crew: crew(group), metrics: Object.fromEntries(metricDefinitions.map(({ key: metric }) => [metric, uniqueAverage(rowMetrics.map((item) => item[metric]))])) as Metrics }; });
   return { flights, sourceRows: rows.length, duplicatesRemoved: rows.length - flights.length, duplicateGroups, conflictingDuplicateGroups: conflicts };
 }
-export type Summary = { label: string; flights: number; metrics: Metrics };
-export function summarizeFlights(flights: Flight[], groupBy: "aircraftType" | "departure" | "arrival"): Summary[] { const groups = new Map<string, Flight[]>(); flights.forEach((flight) => groups.set(flight[groupBy], [...(groups.get(flight[groupBy]) ?? []), flight])); return [...groups].map(([label, items]) => ({ label, flights: items.length, metrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, average(items.map((item) => item.metrics[key]))])) as Metrics })).sort((a, b) => b.flights - a.flights || a.label.localeCompare(b.label, "ru")); }
-export function summarizePilots(flights: Flight[]) { const groups = new Map<string, { member: CrewMember; aircraftType: string; flights: Flight[] }>(); for (const flight of flights) for (const member of flight.crew) { const key = `${member.role}:${member.code}:${flight.aircraftType}`; const group = groups.get(key) ?? { member, aircraftType: flight.aircraftType, flights: [] }; group.flights.push(flight); groups.set(key, group); } const baselines = new Map(summarizeFlights(flights, "aircraftType").map((item) => [item.label, item.metrics])); return [...groups.values()].map(({ member, aircraftType, flights: items }) => ({ ...member, aircraftType, flights: items.length, metrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, average(items.map((item) => item.metrics[key]))])) as Metrics, typeMetrics: baselines.get(aircraftType)! })).sort((a, b) => b.flights - a.flights || a.name.localeCompare(b.name, "ru")); }
+const metricSet = (items: Flight[]) => {
+  const values = (key: FlightMetricKey) => items.map((item) => item.metrics[key]);
+  return {
+    metrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, average(values(key))])) as Metrics,
+    minMetrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, minimum(values(key))])) as Metrics,
+    maxMetrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, maximum(values(key))])) as Metrics,
+  };
+};
+
+export type Summary = { label: string; flights: number; metrics: Metrics; minMetrics: Metrics; maxMetrics: Metrics };
+export function summarizeFlights(flights: Flight[], groupBy: "aircraftType" | "departure" | "arrival"): Summary[] {
+  const groups = new Map<string, Flight[]>();
+  flights.forEach((flight) => groups.set(flight[groupBy], [...(groups.get(flight[groupBy]) ?? []), flight]));
+  return [...groups].map(([label, items]) => ({ label, flights: items.length, ...metricSet(items) })).sort((a, b) => b.flights - a.flights || a.label.localeCompare(b.label, "ru"));
+}
+
+export function formatMetric(value: number | null, key: FlightMetricKey, withUnit = false) {
+  if (value === null) return "—";
+  const metric = metricDefinitions.find((item) => item.key === key)!;
+  const formatted = value.toLocaleString("ru-RU", { minimumFractionDigits: metric.digits, maximumFractionDigits: metric.digits });
+  return withUnit ? `${formatted} ${metric.unit}` : formatted;
+}
+
+export type StatDimension = "aircraftType" | "departure" | "arrival" | "pilots";
+export const statDimensionLabels: Record<StatDimension, string> = {
+  aircraftType: "Типы ВС",
+  departure: "Аэродромы взлёта",
+  arrival: "Аэродромы посадки",
+  pilots: "Пилоты",
+};
+
+export type StatisticRow = {
+  id: string;
+  label: string;
+  subtitle: string;
+  flights: number;
+  metrics: Metrics;
+  minMetrics: Metrics;
+  maxMetrics: Metrics;
+};
+
+export function buildStatisticRows(flights: Flight[], dimension: StatDimension, minFlights = 1): StatisticRow[] {
+  if (dimension === "pilots") {
+    return summarizePilots(flights).filter((pilot) => pilot.flights >= minFlights).map((pilot) => ({
+      id: `${pilot.role}:${pilot.code}:${pilot.aircraftType}`,
+      label: pilot.name,
+      subtitle: `${pilot.role} · ${pilot.code} · ${pilot.aircraftType}`,
+      flights: pilot.flights,
+      metrics: pilot.metrics,
+      minMetrics: pilot.minMetrics,
+      maxMetrics: pilot.maxMetrics,
+    }));
+  }
+  return summarizeFlights(flights, dimension).map((row) => ({
+    id: row.label,
+    label: row.label,
+    subtitle: "",
+    flights: row.flights,
+    metrics: row.metrics,
+    minMetrics: row.minMetrics,
+    maxMetrics: row.maxMetrics,
+  }));
+}
+
+export function collectMetricValues(flights: Flight[], dimension: StatDimension, id: string, metric: FlightMetricKey) {
+  const selected: number[] = [];
+  const others: number[] = [];
+  for (const flight of flights) {
+    const value = flight.metrics[metric];
+    if (value === null) continue;
+    const match = dimension === "pilots"
+      ? flight.crew.some((member) => `${member.role}:${member.code}:${flight.aircraftType}` === id)
+      : flight[dimension] === id;
+    (match ? selected : others).push(value);
+  }
+  return { selected, others };
+}
+
+const niceStep = (span: number, bins: number) => {
+  const raw = span / Math.max(1, bins);
+  const magnitude = 10 ** Math.floor(Math.log10(raw || 1));
+  const residual = raw / magnitude;
+  const nice = residual <= 1 ? 1 : residual <= 2 ? 2 : residual <= 5 ? 5 : 10;
+  return nice * magnitude;
+};
+
+export type HistogramBin = { from: number; to: number; selected: number; others: number };
+
+export function histogramBins(selected: number[], others: number[], binCount = 8): HistogramBin[] {
+  const all = [...selected, ...others];
+  if (!all.length) return [];
+  const min = Math.min(...all);
+  const max = Math.max(...all);
+  if (min === max) return [{ from: min, to: max, selected: selected.length, others: others.length }];
+  const step = niceStep(max - min, binCount);
+  const start = Math.floor(min / step) * step;
+  const end = Math.max(start + step, Math.ceil(max / step) * step);
+  const count = Math.max(1, Math.round((end - start) / step));
+  const bins: HistogramBin[] = Array.from({ length: count }, (_, index) => ({
+    from: start + index * step,
+    to: start + (index + 1) * step,
+    selected: 0,
+    others: 0,
+  }));
+  const place = (value: number, key: "selected" | "others") => {
+    const index = Math.min(count - 1, Math.max(0, Math.floor((value - start) / step)));
+    bins[index][key] += 1;
+  };
+  selected.forEach((value) => place(value, "selected"));
+  others.forEach((value) => place(value, "others"));
+  return bins;
+}
+export type PilotSummary = {
+  code: string;
+  name: string;
+  role: CrewMember["role"];
+  aircraftType: string;
+  flights: number;
+  metrics: Metrics;
+  minMetrics: Metrics;
+  maxMetrics: Metrics;
+  typeMetrics: Metrics;
+};
+export function summarizePilots(flights: Flight[]): PilotSummary[] {
+  const groups = new Map<string, { member: CrewMember; aircraftType: string; flights: Flight[] }>();
+  for (const flight of flights) for (const member of flight.crew) {
+    const key = `${member.role}:${member.code}:${flight.aircraftType}`;
+    const group = groups.get(key) ?? { member, aircraftType: flight.aircraftType, flights: [] };
+    group.flights.push(flight);
+    groups.set(key, group);
+  }
+  const baselines = new Map(summarizeFlights(flights, "aircraftType").map((item) => [item.label, item.metrics]));
+  return [...groups.values()].map(({ member, aircraftType, flights: items }) => {
+    const values = (key: FlightMetricKey) => items.map((item) => item.metrics[key]);
+    return {
+      ...member,
+      aircraftType,
+      flights: items.length,
+      metrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, average(values(key))])) as Metrics,
+      minMetrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, minimum(values(key))])) as Metrics,
+      maxMetrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, maximum(values(key))])) as Metrics,
+      typeMetrics: baselines.get(aircraftType)!,
+    };
+  }).sort((a, b) => b.flights - a.flights || a.name.localeCompare(b.name, "ru"));
+}

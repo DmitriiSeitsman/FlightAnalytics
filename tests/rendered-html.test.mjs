@@ -17,6 +17,8 @@ test("renders the Flight Analytics product", async () => {
   assert.match(html, /Flight Analytics — аналитика лётных данных/);
   assert.match(html, /Загрузите статистику/);
   assert.match(html, /Перетащите Excel сюда/);
+  assert.match(html, /Мин \/ среднее \/ макс/);
+  assert.match(html, /Excel или PDF/);
   assert.doesNotMatch(html, /Эшелон рейса/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/);
 });
