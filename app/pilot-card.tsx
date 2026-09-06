@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatMetric, metricDefinitions, type Flight, type FlightMetricKey, type PilotSummary } from "./flight-data";
+import { formatFlightDate, formatMetric, metricDefinitions, normalizeFlightDate, type Flight, type FlightMetricKey, type PilotSummary } from "./flight-data";
 
 interface PilotCardProps {
   pilot: PilotSummary;
@@ -26,25 +26,19 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
   );
 
   const dateRange = useMemo(() => {
-    const dates = pilotFlights.map(f => f.date).filter((d): d is string => Boolean(d));
+    const dates = pilotFlights.map((flight) => normalizeFlightDate(flight.date)).filter((date): date is string => Boolean(date));
     if (dates.length === 0) return { min: "", max: "", displayMin: "", displayMax: "" };
     const sorted = [...dates].sort();
-    const firstDate = new Date(sorted[0]);
-    const lastDate = new Date(sorted[sorted.length - 1]);
-    
-    if (isNaN(firstDate.getTime()) || isNaN(lastDate.getTime())) {
-      return { min: "", max: "", displayMin: "", displayMax: "" };
-    }
-    
-    // С 1-го числа месяца первого рейса по последнее число месяца последнего рейса
-    const monthStart = new Date(firstDate.getFullYear(), firstDate.getMonth(), 1);
-    const monthEnd = new Date(lastDate.getFullYear(), lastDate.getMonth() + 1, 0);
-    
+    const [firstYear, firstMonth] = sorted[0].split("-").map(Number);
+    const [lastYear, lastMonth] = sorted[sorted.length - 1].split("-").map(Number);
+    const min = `${String(firstYear).padStart(4, "0")}-${String(firstMonth).padStart(2, "0")}-01`;
+    const lastDay = new Date(Date.UTC(lastYear, lastMonth, 0)).getUTCDate();
+    const max = `${String(lastYear).padStart(4, "0")}-${String(lastMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     return {
-      min: monthStart.toISOString().split('T')[0],
-      max: monthEnd.toISOString().split('T')[0],
-      displayMin: new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }).format(monthStart),
-      displayMax: new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }).format(monthEnd)
+      min,
+      max,
+      displayMin: formatFlightDate(min),
+      displayMax: formatFlightDate(max),
     };
   }, [pilotFlights]);
 
@@ -64,7 +58,7 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
         flight.board?.toLowerCase().includes(flightSearch.toLowerCase()) ||
         `${flight.departure} ${flight.arrival}`.toLowerCase().includes(flightSearch.toLowerCase());
       
-      const flightDateForCompare = flight.date ? new Date(flight.date).toISOString().split('T')[0] : "";
+      const flightDateForCompare = normalizeFlightDate(flight.date) ?? "";
       const matchesDateFrom = !dateFrom || flightDateForCompare >= dateFrom;
       const matchesDateTo = !dateTo || flightDateForCompare <= dateTo;
       
@@ -75,7 +69,7 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
   const sortedFlights = useMemo(() => {
     return [...filteredFlights].sort((a, b) => {
       const getValue = (flight: Flight, key: FlightSortKey) => {
-        if (key === "date") return flight.date || "";
+        if (key === "date") return normalizeFlightDate(flight.date) ?? flight.date ?? "";
         if (key === "flightNumber") return flight.flightNumber || "";
         if (key === "route") return `${flight.departure} ${flight.arrival}`;
         if (key === "departureTime") return flight.departureTime || "";
@@ -99,14 +93,7 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
   }, [filteredFlights, flightSort]);
 
   const formatDate = (dateStr: string) => {
-    if (!dateStr) return "—";
-    try {
-      const date = new Date(dateStr);
-      if (isNaN(date.getTime())) return dateStr;
-      return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
-    } catch {
-      return dateStr;
-    }
+    return formatFlightDate(dateStr);
   };
 
   const formatTime = (timeStr: string) => {

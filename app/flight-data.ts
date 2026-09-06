@@ -15,6 +15,30 @@ type CrewMember = { code: string; name: string; role: "КВС" | "2П" };
 export type Flight = { key: string; aircraftType: string; departure: string; arrival: string; crew: CrewMember[]; metrics: Metrics; flightNumber: string; date: string; departureTime: string; arrivalTime: string; board: string };
 export type ImportResult = { flights: Flight[]; sourceRows: number; duplicatesRemoved: number; duplicateGroups: number; conflictingDuplicateGroups: number };
 
+const validFlightDateKey = (year: number, month: number, day: number) => {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+};
+
+export function normalizeFlightDate(value: string | null | undefined) {
+  const source = value?.trim() ?? "";
+  if (!source) return null;
+  const russian = source.match(/^(\d{1,2})[-./](\d{1,2})[-./](\d{4})$/);
+  if (russian) return validFlightDateKey(Number(russian[3]), Number(russian[2]), Number(russian[1]));
+  const iso = source.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:T|\s|$)/);
+  if (iso) return validFlightDateKey(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+  const parsed = new Date(source);
+  return Number.isNaN(parsed.getTime()) ? null : validFlightDateKey(parsed.getUTCFullYear(), parsed.getUTCMonth() + 1, parsed.getUTCDate());
+}
+
+export function formatFlightDate(value: string | null | undefined) {
+  const normalized = normalizeFlightDate(value);
+  if (!normalized) return value?.trim() || "—";
+  const [year, month, day] = normalized.split("-");
+  return `${day}.${month}.${year}`;
+}
+
 const required = ["ID_Poleta", "Nazvanie_Aeroporta_Vzleta", "Nazvanie_Aeroporta_Posadki", "FIO_KVS", "Kod_KVS", "FIO_2P", "Kod_2P", "Bort", "Tip_VS", "Reys", "Data_Poleta", "Vremya_Vzleta", "Vremya_Posadki", "Tangazh_Pri_Otrive", "Eshelon_1", "Skorost_Vhoda_V_Glissadu", "Visota_Otklyucheniya_Avtopilota", "Rasstoyanie_proleta_ot_torca_VPP_do_kasaniya", "Vremya_proleta_ot_torca_VPP_do_kasaniya", "Vertikalnaya_Peregruzka_Na_Posadke", "Skorost_Viklyucheniya_Reversa"];
 const text = (value: unknown): string => { if (value == null) return ""; if (value instanceof Date) return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }).format(value); if (typeof value === "object") { const item = value as { text?: unknown; result?: unknown; richText?: Array<{ text?: unknown }> }; if (item.text !== undefined) return text(item.text); if (item.result !== undefined) return text(item.result); if (item.richText) return item.richText.map((part) => text(part.text)).join("").trim(); } return String(value).trim(); };
 const number = (value: unknown) => { if (typeof value === "number") return Number.isFinite(value) ? value : null; const source = text(value); const parsed = Number(source.replace(/\s/g, "").replace(",", ".")); return source && Number.isFinite(parsed) ? parsed : null; };

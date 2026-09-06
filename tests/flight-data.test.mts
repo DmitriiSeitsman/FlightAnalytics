@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildStatisticRows, collectMetricSeries, histogramBins, multiHistogramBins, summarizePilots, type Flight } from "../app/flight-data.ts";
+import { buildStatisticRows, collectMetricSeries, histogramBins, multiHistogramBins, normalizeFlightDate, summarizePilots, type Flight } from "../app/flight-data.ts";
 
 function flight(overrides: Partial<Omit<Flight, "metrics">> & Pick<Flight, "key" | "crew"> & { metrics?: Partial<Flight["metrics"]> }): Flight {
   const base: Flight = {
@@ -22,6 +22,13 @@ function flight(overrides: Partial<Omit<Flight, "metrics">> & Pick<Flight, "key"
   };
   return { ...base, ...overrides, metrics: { ...base.metrics, ...overrides.metrics } };
 }
+
+test("normalizeFlightDate safely handles Excel-style Russian dates", () => {
+  assert.equal(normalizeFlightDate("06.09.2026"), "2026-09-06");
+  assert.equal(normalizeFlightDate("2026-09-06"), "2026-09-06");
+  assert.equal(normalizeFlightDate("31.02.2026"), null);
+  assert.equal(normalizeFlightDate("не дата"), null);
+});
 
 test("summarizePilots keeps min, average and max for each metric", () => {
   const pilots = summarizePilots([
