@@ -133,7 +133,7 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
   border: 1px solid #d7dde1;
   border-radius: 10px;
   background: #f8fafb;
-  margin-top: 12px;
+  margin: 12px 28px 0;
 }
 
 .pilot-card-date-range span { color: #63717d; font-size: 9px; font-weight: 900; letter-spacing: 0.065em; text-transform: uppercase; }
