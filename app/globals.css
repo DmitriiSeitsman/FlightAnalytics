@@ -35,6 +35,197 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 .comparison-picker select:hover:not(:disabled) { border-color:#9dabb5; }.comparison-picker select:focus { border-color:var(--navy); box-shadow:0 0 0 4px #18396412; }.comparison-picker select:disabled { cursor:not-allowed; opacity:.55; }
 .live-select { position:relative; display:grid; min-width:0; gap:8px; }.live-select.is-open { z-index:12; }.live-select>label>span { display:block; }.live-select-control { position:relative; }.live-select-control>svg { position:absolute; z-index:1; left:14px; top:16px; color:#7b8a94; pointer-events:none; }.live-select-control input { width:100%; height:48px; padding:0 46px 0 40px; border:1px solid #c7d1d8; border-radius:12px; outline:none; background:#fff; color:var(--ink); font-size:12px; font-weight:700; transition:border-color .15s ease,box-shadow .15s ease; }.live-select-control input::placeholder { color:#8b979f; font-weight:500; }.live-select-control input:hover:not(:disabled) { border-color:#9dabb5; }.live-select-control input:focus { border-color:var(--navy); box-shadow:0 0 0 4px #18396412; }.live-select.is-disabled { opacity:.55; }.live-select-control input:disabled { cursor:not-allowed; }
 .live-select-toggle { position:absolute; right:1px; top:1px; display:grid; width:40px; height:46px; place-items:center; padding:0; border:0; border-left:1px solid #dde4e8; border-radius:0 11px 11px 0; cursor:pointer; background:#f8fafb; color:#607585; }.live-select-toggle:hover:not(:disabled) { background:#eef3f6; }.live-select-toggle:disabled { cursor:not-allowed; }.live-select.is-open .live-select-toggle svg { transform:rotate(180deg); }
+
+/* Pilot Card Styles */
+.pilot-row { cursor: pointer; transition: background-color 0.15s ease; }
+.pilot-row:hover { background-color: #f0f7ff; }
+.pilot-row:hover td { background-color: #f0f7ff; }
+
+.pilot-card-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: rgba(20, 36, 58, 0.6); backdrop-filter: blur(4px); animation: fadeIn 0.2s ease; }
+
+.pilot-card-backdrop { position: absolute; inset: 0; border: 0; background: transparent; cursor: default; }
+
+.pilot-card { position: relative; z-index: 1; width: 100%; max-width: 1400px; max-height: 95vh; overflow: hidden; display: flex; flex-direction: column; border: 1px solid #ccd7de; border-radius: 20px; background: white; box-shadow: 0 25px 60px rgba(16, 39, 64, 0.25); animation: slideUp 0.3s ease; }
+
+.pilot-card-header { position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 24px 28px; border-bottom: 1px solid #e5e9ea; background: linear-gradient(135deg, #f8fafb 0%, #f1f5f8 100%); }
+
+.pilot-card-header h2 { margin: 0 0 8px; color: var(--ink); font-size: 24px; letter-spacing: -0.03em; }
+
+.pilot-card-meta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+
+.pilot-card-role, .pilot-card-code, .pilot-card-aircraft { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; }
+
+.pilot-card-role { background: #e8f0f5; color: var(--navy); }
+
+.pilot-card-code { background: #fef3e8; color: #b5652d; }
+
+.pilot-card-aircraft { background: #e8f5f0; color: var(--green); }
+
+.pilot-card-close { position: absolute; top: 20px; right: 20px; display: grid; width: 36px; height: 36px; place-items: center; padding: 0; border: 0; border-radius: 10px; cursor: pointer; background: white; color: #7b8a94; font-size: 24px; font-weight: 300; line-height: 1; transition: all 0.15s ease; }
+
+.pilot-card-close:hover { background: var(--red); color: white; }
+
+/* Statistics Summary */
+.pilot-card-stats-summary { padding: 24px 28px; border-bottom: 1px solid #e5e9ea; background: #fafbfc; }
+
+.pilot-card-stats-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+
+.pilot-card-stats-header > div { display: grid; gap: 4px; }
+
+.pilot-card-stats-header span { color: #63717d; font-size: 9px; font-weight: 900; letter-spacing: 0.065em; text-transform: uppercase; }
+
+.pilot-card-stats-header strong { color: var(--ink); font-size: 16px; letter-spacing: -0.02em; }
+
+.pilot-card-metric-select { appearance: none; min-width: 200px; height: 40px; padding: 0 36px 0 14px; border: 1px solid #c7d1d8; border-radius: 10px; outline: none; background-color: white; background-image: linear-gradient(45deg, transparent 50%, #607585 50%), linear-gradient(135deg, #607585 50%, transparent 50%), linear-gradient(to right, #dde4e8, #dde4e8); background-position: calc(100% - 15px) 17px, calc(100% - 10px) 17px, calc(100% - 30px) 7px; background-repeat: no-repeat; background-size: 4px 4px, 4px 4px, 1px 24px; color: var(--ink); font-size: 11px; font-weight: 700; cursor: pointer; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+
+.pilot-card-metric-select:hover { border-color: #9dabb5; }
+
+.pilot-card-metric-select:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(24, 57, 100, 0.1); }
+
+.pilot-card-stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+
+.pilot-card-stat-card { display: grid; gap: 12px; padding: 18px 20px; border: 1px solid #d7dde1; border-radius: 14px; background: white; box-shadow: 0 8px 20px rgba(16, 39, 64, 0.06); transition: transform 0.15s ease, box-shadow 0.15s ease; }
+
+.pilot-card-stat-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(16, 39, 64, 0.1); }
+
+.pilot-card-stat-card.is-primary { border-color: #c8dce8; background: linear-gradient(135deg, #f8fbff 0%, #f0f6ff 100%); }
+
+.pilot-card-stat-card span { color: #63717d; font-size: 9px; font-weight: 900; letter-spacing: 0.065em; text-transform: uppercase; }
+
+.pilot-card-stat-card strong { color: var(--ink); font-size: 18px; letter-spacing: -0.02em; }
+
+.pilot-card-stat-card dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; }
+
+.pilot-card-stat-card dt { color: #74818a; font-size: 10px; font-weight: 600; }
+
+.pilot-card-stat-card dd { color: var(--ink); font-size: 13px; font-weight: 700; margin: 0; }
+
+.pilot-card-stat-card dd.positive { color: var(--green); }
+
+.pilot-card-stat-card dd.negative { color: var(--red); }
+
+/* Flight Filters */
+.pilot-card-filters { display: grid; grid-template-columns: repeat(3, minmax(180px, 1fr)) minmax(120px, auto); gap: 12px; align-items: end; padding: 20px 28px; border-bottom: 1px solid #e5e9ea; background: white; }
+
+.pilot-card-filter { display: grid; gap: 6px; }
+
+.pilot-card-filter label { color: #63717d; font-size: 9px; font-weight: 900; letter-spacing: 0.065em; text-transform: uppercase; }
+
+.pilot-card-filter input { width: 100%; height: 40px; padding: 0 12px; border: 1px solid #c7d1d8; border-radius: 10px; outline: none; background: #f9fbfc; color: var(--ink); font-size: 11px; font-weight: 700; transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease; }
+
+.pilot-card-filter input:hover { border-color: #9dabb5; background-color: white; }
+
+.pilot-card-filter input:focus { border-color: var(--navy); background-color: white; box-shadow: 0 0 0 3px rgba(24, 57, 100, 0.1); }
+
+.pilot-card-filter input::placeholder { color: #98a4ad; font-weight: 500; }
+
+.pilot-card-filter-info { display: grid; gap: 4px; padding: 8px 12px; border: 1px solid #d7dde1; border-radius: 10px; background: #f8fafb; text-align: center; }
+
+.pilot-card-filter-info span { color: #63717d; font-size: 9px; font-weight: 900; letter-spacing: 0.065em; text-transform: uppercase; }
+
+.pilot-card-filter-info strong { color: var(--ink); font-size: 16px; }
+
+.pilot-card-date-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid #d7dde1;
+  border-radius: 10px;
+  background: #f8fafb;
+  margin-top: 12px;
+}
+
+.pilot-card-date-range span { color: #63717d; font-size: 9px; font-weight: 900; letter-spacing: 0.065em; text-transform: uppercase; }
+
+.pilot-card-date-range strong { color: var(--ink); font-size: 11px; }
+
+/* Flights Table */
+.pilot-card-flights { flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 20px 28px 28px; }
+
+.pilot-card-flights h3 { margin: 0 0 16px; color: var(--ink); font-size: 16px; letter-spacing: -0.02em; }
+
+.pilot-card-empty { color: #74818a; font-size: 12px; font-style: italic; }
+
+.pilot-card-flights-table { flex: 1; overflow: auto; border: 1px solid #e5e9ea; border-radius: 12px; background: white; }
+
+.pilot-card-flights-table table {
+  table-layout: auto;
+  width: max-content;
+  min-width: 0;
+  font-size: 10px;
+}
+
+.pilot-card-flights-table thead th {
+  position: sticky; top: 0; z-index: 1; padding: 10px 8px;
+  background: #f3f6f7; color: #687985; font-size: 8px;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  cursor: pointer; user-select: none; transition: background-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.pilot-card-flights-table thead th:hover { background: #e8eef1; }
+
+.pilot-card-flights-table thead th.active { background: #e8f0f5; color: var(--navy); }
+
+.pilot-card-flights-table th,
+.pilot-card-flights-table td { width: 1%; }
+
+.pilot-card-flights-table td { padding: 8px; white-space: nowrap; }
+
+/* Умная ширина для конкретных столбцов */
+.pilot-card-flights-table th:nth-child(1), /* Дата */
+.pilot-card-flights-table td:nth-child(1) {
+  width: 1%;
+  min-width: 70px;
+  max-width: 90px;
+}
+
+.pilot-card-flights-table th:nth-child(2), /* Рейс */
+.pilot-card-flights-table td:nth-child(2) {
+  width: 1%;
+  min-width: 50px;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pilot-card-flights-table th:nth-child(4), /* Вылет */
+.pilot-card-flights-table td:nth-child(4),
+.pilot-card-flights-table th:nth-child(5), /* Посадка */
+.pilot-card-flights-table td:nth-child(5) {
+  width: 1%;
+  min-width: 50px;
+  max-width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pilot-card-flights-table th:nth-child(6), /* Борт */
+.pilot-card-flights-table td:nth-child(6) {
+  width: 1%;
+  min-width: 50px;
+  max-width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pilot-card-flights-table tbody tr:hover { background: #f9fbfb; }
+
+.route-cell {
+  min-width: 100px;
+  max-width: 150px;
+}
+
+.route-cell { display: flex; align-items: center; gap: 6px; }
+
+.route-departure, .route-arrival { font-weight: 600; }
+
+.route-arrow { color: #9daab3; font-size: 10px; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 .live-select-menu { position:absolute; z-index:20; top:74px; left:0; width:100%; overflow:hidden; border:1px solid #bfcbd3; border-radius:13px; background:#fff; box-shadow:0 18px 42px #10274029; }.live-select-status { padding:8px 11px; border-bottom:1px solid #e4e9ec; background:#f5f8f9; color:#71808a; font-size:8px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }.live-select-options { max-height:280px; overflow:auto; padding:5px; overscroll-behavior:contain; }.live-select-options>button { display:flex; width:100%; align-items:center; justify-content:space-between; gap:10px; padding:9px 10px; border:0; border-radius:9px; cursor:pointer; background:transparent; color:var(--ink); text-align:left; }.live-select-options>button:hover,.live-select-options>button.is-active { background:#eef3f7; }.live-select-options>button.is-selected { background:#fff0f2; color:#9e1830; }.live-select-options>button span { min-width:0; }.live-select-options>button strong,.live-select-options>button small { display:block; }.live-select-options>button strong { overflow:hidden; font-size:11px; text-overflow:ellipsis; white-space:nowrap; }.live-select-options>button small { margin-top:3px; overflow:hidden; color:#7b8992; font-size:8px; text-overflow:ellipsis; white-space:nowrap; }.live-select-options>button>i { display:grid; width:19px; height:19px; flex:0 0 auto; place-items:center; border-radius:50%; background:var(--red); color:#fff; font-size:9px; font-style:normal; }.live-select-options>p { margin:0; padding:20px 12px; color:#596975; font-size:11px; font-weight:800; text-align:center; }.live-select-options>p small { display:block; margin-top:4px; color:#8b979f; font-size:8px; font-weight:500; }
 .comparison-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
 .comparison-chip { display:flex; min-width:190px; max-width:330px; align-items:center; gap:9px; padding:8px 9px 8px 10px; border:1px solid color-mix(in srgb,var(--series-color) 25%,#d7dde1); border-radius:12px; background:#fff; box-shadow:0 4px 12px #10274009; }
