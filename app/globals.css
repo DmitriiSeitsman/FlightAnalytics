@@ -156,12 +156,13 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
   font-size: 10px;
 }
 
-.pilot-card-flights-table thead th {
+.pilot-card-flights-table table:not(.pilot-table) thead th {
   position: sticky; top: 0; z-index: 1; padding: 10px 8px;
   background: #f3f6f7; color: #687985; font-size: 8px;
   letter-spacing: 0.04em; text-transform: uppercase;
   cursor: pointer; user-select: none; transition: background-color 0.15s ease;
   white-space: nowrap;
+  min-width: 0;
 }
 
 .pilot-card-flights-table thead th:hover { background: #e8eef1; }
@@ -169,55 +170,17 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 .pilot-card-flights-table thead th.active { background: #e8f0f5; color: var(--navy); }
 
 .pilot-card-flights-table th,
-.pilot-card-flights-table td { width: 1%; }
+.pilot-card-flights-table td {
+  width: auto;
+  min-width: 0;
+  max-width: none;
+}
 
 .pilot-card-flights-table td { padding: 8px; white-space: nowrap; }
 
-/* Умная ширина для конкретных столбцов */
-.pilot-card-flights-table th:nth-child(1), /* Дата */
-.pilot-card-flights-table td:nth-child(1) {
-  width: 1%;
-  min-width: 70px;
-  max-width: 90px;
-}
-
-.pilot-card-flights-table th:nth-child(2), /* Рейс */
-.pilot-card-flights-table td:nth-child(2) {
-  width: 1%;
-  min-width: 50px;
-  max-width: 80px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.pilot-card-flights-table th:nth-child(4), /* Вылет */
-.pilot-card-flights-table td:nth-child(4),
-.pilot-card-flights-table th:nth-child(5), /* Посадка */
-.pilot-card-flights-table td:nth-child(5) {
-  width: 1%;
-  min-width: 50px;
-  max-width: 70px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.pilot-card-flights-table th:nth-child(6), /* Борт */
-.pilot-card-flights-table td:nth-child(6) {
-  width: 1%;
-  min-width: 50px;
-  max-width: 70px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .pilot-card-flights-table tbody tr:hover { background: #f9fbfb; }
 
-.route-cell {
-  min-width: 100px;
-  max-width: 150px;
-}
-
-.route-cell { display: flex; align-items: center; gap: 6px; }
+.route-content { display: inline-flex; align-items: center; gap: 6px; }
 
 .route-departure, .route-arrival { font-weight: 600; }
 

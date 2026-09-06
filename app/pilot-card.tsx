@@ -263,9 +263,11 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
                       <td>{formatDate(flight.date)}</td>
                       <td>{flight.flightNumber || "—"}</td>
                       <td className="route-cell">
-                        <div className="route-departure">{flight.departure}</div>
-                        <div className="route-arrow">→</div>
-                        <div className="route-arrival">{flight.arrival}</div>
+                        <span className="route-content">
+                          <span className="route-departure">{flight.departure}</span>
+                          <span className="route-arrow">→</span>
+                          <span className="route-arrival">{flight.arrival}</span>
+                        </span>
                       </td>
                       <td>{formatTime(flight.departureTime)}</td>
                       <td>{formatTime(flight.arrivalTime)}</td>
