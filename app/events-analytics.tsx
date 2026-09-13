@@ -11,7 +11,7 @@ interface EventsAnalyticsProps {
 }
 
 const COLOR_ORDER: EventColor[] = ["clRed", "clOrange", "clBlack", "clOlive", "clFuchsia", "clGreen", "unknown"];
-const COLOR_LABELS: Record<EventColor, string> = {
+export const COLOR_LABELS: Record<EventColor, string> = {
   clRed: "Красные",
   clOrange: "Оранжевые", 
   clBlack: "Черные",
@@ -21,7 +21,7 @@ const COLOR_LABELS: Record<EventColor, string> = {
   unknown: "Неизвестные"
 };
 
-const COLOR_STYLES: Record<EventColor, { bg: string; text: string; border: string }> = {
+export const COLOR_STYLES: Record<EventColor, { bg: string; text: string; border: string }> = {
   clRed: { bg: "#fef2f2", text: "#dc2626", border: "#fecaca" },
   clOrange: { bg: "#fff7ed", text: "#ea580c", border: "#fed7aa" },
   clBlack: { bg: "#f3f4f6", text: "#374151", border: "#d1d5db" },

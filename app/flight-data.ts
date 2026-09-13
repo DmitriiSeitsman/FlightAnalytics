@@ -68,6 +68,37 @@ export function formatFlightDate(value: string | null | undefined) {
   return `${day}.${month}.${year}`;
 }
 
+// Приоритет "тяжести" цвета события при выборе главного цвета рейса:
+// красный тяжелее оранжевого, тот тяжелее оливкового, затем чёрный, затем зелёный.
+// Фиолетовый и неизвестный цвет явно не оговорены, поэтому идут последними.
+export const EVENT_COLOR_SEVERITY: Record<EventColor, number> = {
+  clRed: 1,
+  clOrange: 2,
+  clOlive: 3,
+  clBlack: 4,
+  clGreen: 5,
+  clFuchsia: 6,
+  unknown: 7,
+};
+
+export function worstEventColor(events: Event[]): EventColor | null {
+  if (!events.length) return null;
+  return events.reduce<EventColor>(
+    (worst, event) => (EVENT_COLOR_SEVERITY[event.color] < EVENT_COLOR_SEVERITY[worst] ? event.color : worst),
+    events[0].color
+  );
+}
+
+export function summarizeEventColors(events: Event[], labels: Record<EventColor, string>): string {
+  if (!events.length) return "";
+  const counts = new Map<EventColor, number>();
+  events.forEach((event) => counts.set(event.color, (counts.get(event.color) ?? 0) + 1));
+  return [...counts.entries()]
+    .sort(([left], [right]) => EVENT_COLOR_SEVERITY[left] - EVENT_COLOR_SEVERITY[right])
+    .map(([color, count]) => `${labels[color]}: ${count}`)
+    .join(", ");
+}
+
 const required = ["ID_Poleta", "Nazvanie_Aeroporta_Vzleta", "Nazvanie_Aeroporta_Posadki", "FIO_KVS", "Kod_KVS", "FIO_2P", "Kod_2P", "Bort", "Tip_VS", "Reys", "Data_Poleta", "Vremya_Vzleta", "Vremya_Posadki", "Tangazh_Pri_Otrive", "Eshelon_1", "Skorost_Vhoda_V_Glissadu", "Visota_Otklyucheniya_Avtopilota", "Rasstoyanie_proleta_ot_torca_VPP_do_kasaniya", "Vremya_proleta_ot_torca_VPP_do_kasaniya", "Vertikalnaya_Peregruzka_Na_Posadke", "Skorost_Viklyucheniya_Reversa"];
 const eventsRequired = ["Text_Sobitiya", "Color", "Kod_KVS", "FIO_KVS", "Data_Poleta", "Reys"];
 export const shortenPilotName = (fio: string): string => {

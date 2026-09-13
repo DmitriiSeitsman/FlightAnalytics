@@ -5,8 +5,9 @@ import { formatMetric, metricDefinitions, parseFlightRows, parseEventRows, merge
 import { StatisticsView } from "./statistics-view";
 import { PilotCard } from "./pilot-card";
 import { EventsAnalytics } from "./events-analytics";
+import { FlightsView } from "./flights-view";
 
-type View = "aircraftType" | "departure" | "arrival" | "pilots" | "statistics" | "events";
+type View = "aircraftType" | "departure" | "arrival" | "flights" | "pilots" | "statistics" | "events";
 type SortDirection = "asc" | "desc";
 type ImportProgress = { progress: number; title: string; detail: string };
 type SummarySortKey = "label" | "flights" | FlightMetricKey;
@@ -149,7 +150,7 @@ export default function Home() {
   const aircraftTypes = useMemo(() => [...new Set(result?.flights.map((item) => item.aircraftType) ?? [])].sort(), [result]);
   const airports = useMemo(() => [...new Set(result?.flights.flatMap((item) => [item.departure, item.arrival]) ?? [])].sort(), [result]);
   const flights = useMemo(() => (result?.flights ?? []).filter((flight) => (!aircraftType || flight.aircraftType === aircraftType) && (!airport || flight.departure === airport || flight.arrival === airport)), [aircraftType, airport, result]);
-  const summaries = useMemo(() => view === "pilots" || view === "statistics" || view === "events" ? [] : summarizeFlights(flights, view), [flights, view]);
+  const summaries = useMemo(() => view === "pilots" || view === "statistics" || view === "events" || view === "flights" ? [] : summarizeFlights(flights, view), [flights, view]);
   const pilots = useMemo(() => summarizePilots(flights).filter((pilot) => pilot.flights >= minimumFlights && (!pilotSearch || `${pilot.name} ${pilot.code}`.toLocaleLowerCase("ru-RU").includes(pilotSearch.toLocaleLowerCase("ru-RU")))), [flights, minimumFlights, pilotSearch]);
   const selectedMetric = metricDefinitions.find((item) => item.key === pilotMetric)!;
   const sortedSummaries = useMemo(() => [...summaries].sort((left, right) => {
@@ -241,9 +242,9 @@ export default function Home() {
           <label><span>Аэропорт маршрута</span><select value={airport} onChange={(event) => setAirport(event.target.value)}><option value="">Все аэропорты</option>{airports.map((item) => <option key={item}>{item}</option>)}</select></label>
           <div><span>В выборке</span><strong>{flights.length.toLocaleString("ru-RU")} рейсов</strong></div>
         </div>
-        <nav className="tabs" aria-label="Разрез аналитики">{([["aircraftType", "Типы ВС"], ["departure", "Аэродромы взлёта"], ["arrival", "Аэродромы посадки"], ["pilots", "Пилоты"], ["statistics", "Статистика"], ...(result?.events && result.events.length > 0 ? [["events", "События"] as [View, string]] : [])] as Array<[View, string]>).map(([key, label]) => <button type="button" className={view === key ? "active" : ""} key={key} onClick={() => setView(key)}>{label}</button>)}</nav>
-        {view !== "statistics" && <p className="sort-help">Отметьте галочками нужные столбцы. Цифры показывают порядок сортировки; стрелка меняет направление.<span className="mobile-table-hint">↔ Проведите по таблице влево, чтобы увидеть остальные столбцы.</span></p>}
-        {view === "statistics" ? <StatisticsView flights={flights} sourceFile={fileName} aircraftFilter={aircraftType} airportFilter={airport} /> : view === "events" ? <EventsAnalytics flights={flights} events={result?.events || []} aircraftFilter={aircraftType} airportFilter={airport} /> : view === "pilots" ? <>
+        <nav className="tabs" aria-label="Разрез аналитики">{([["aircraftType", "Типы ВС"], ["departure", "Аэродромы взлёта"], ["arrival", "Аэродромы посадки"], ["flights", "Рейсы"], ["pilots", "Пилоты"], ["statistics", "Статистика"], ...(result?.events && result.events.length > 0 ? [["events", "События"] as [View, string]] : [])] as Array<[View, string]>).map(([key, label]) => <button type="button" className={view === key ? "active" : ""} key={key} onClick={() => setView(key)}>{label}</button>)}</nav>
+        {view !== "statistics" && view !== "flights" && <p className="sort-help">Отметьте галочками нужные столбцы. Цифры показывают порядок сортировки; стрелка меняет направление.<span className="mobile-table-hint">↔ Проведите по таблице влево, чтобы увидеть остальные столбцы.</span></p>}
+        {view === "statistics" ? <StatisticsView flights={flights} sourceFile={fileName} aircraftFilter={aircraftType} airportFilter={airport} /> : view === "events" ? <EventsAnalytics flights={flights} events={result?.events || []} aircraftFilter={aircraftType} airportFilter={airport} /> : view === "flights" ? <FlightsView flights={flights} /> : view === "pilots" ? <>
           <div className="pilot-controls"><label><span>Показатель</span><select value={pilotMetric} onChange={(event) => setPilotMetric(event.target.value as FlightMetricKey)}>{metricDefinitions.map((item) => <option value={item.key} key={item.key}>{item.label}</option>)}</select></label><label><span>Поиск пилота</span><input placeholder="ФИО или табельный номер" value={pilotSearch} onChange={(event) => setPilotSearch(event.target.value)} /></label><label><span>Минимум рейсов</span><input type="number" min="1" value={minimumFlights} onChange={(event) => setMinimumFlights(Math.max(1, Number(event.target.value) || 1))} /></label></div>
           <p className="note">В форме нет признака пилотирующего пилота (PF), поэтому показаны рейсы, где пилот входил в состав экипажа. Нажмите на строку пилота для просмотра детальной информации.</p>
           <div className="table-shell"><table className="pilot-table"><thead><tr>

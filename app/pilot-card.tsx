@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatFlightDate, formatMetric, metricDefinitions, normalizeFlightDate, type Flight, type FlightMetricKey, type PilotSummary } from "./flight-data";
+import { formatFlightDate, formatMetric, metricDefinitions, normalizeFlightDate, worstEventColor, summarizeEventColors, type Flight, type FlightMetricKey, type PilotSummary } from "./flight-data";
 import { PilotRadarChart, type PilotRadarAxis } from "./histogram";
+import { COLOR_LABELS, COLOR_STYLES } from "./events-analytics";
+import { FlightDetailCard } from "./flight-detail-card";
 
 interface PilotCardProps {
   pilot: PilotSummary;
@@ -17,6 +19,7 @@ type PilotCardTab = "stats" | "flights";
 
 export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
   const [tab, setTab] = useState<PilotCardTab>("stats");
+  const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<FlightMetricKey>("landingNy");
   const [flightSearch, setFlightSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -105,6 +108,8 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
     return timeStr;
   };
 
+  const flightEventsTitle = (flight: Flight) => summarizeEventColors(flight.events, COLOR_LABELS);
+
   const handleSort = (key: FlightSortKey) => {
     setFlightSort(current => ({
       key,
@@ -128,6 +133,7 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
   const delta = pilotAverage !== null && typeAverage !== null ? pilotAverage - typeAverage : null;
 
   return (
+    <>
     <div className="pilot-card-overlay">
       <button type="button" className="pilot-card-backdrop" onClick={onClose} aria-label="Закрыть карточку пилота" />
       <div className="pilot-card" role="dialog" aria-modal="true" aria-labelledby="pilot-card-title">
@@ -279,6 +285,7 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
                     <th onClick={() => handleSort("board")} className={flightSort.key === "board" ? "active" : ""}>
                       Борт {flightSort.key === "board" && (flightSort.direction === "asc" ? "↑" : "↓")}
                     </th>
+                    <th>События</th>
                     {metricDefinitions.map((metric) => (
                       <th 
                         key={metric.key} 
@@ -291,9 +298,12 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedFlights.map((flight, index) => (
-                    <tr key={`${flight.key}-${index}`}>
-                      <td>{formatDate(flight.date)}</td>
+                  {sortedFlights.map((flight, index) => {
+                    const eventColor = worstEventColor(flight.events);
+                    const stripeStyle = eventColor ? { boxShadow: `inset 4px 0 0 ${COLOR_STYLES[eventColor].text}` } : undefined;
+                    return (
+                    <tr key={`${flight.key}-${index}`} className="pilot-card-flight-row" onClick={() => setSelectedFlight(flight)}>
+                      <td style={stripeStyle}>{formatDate(flight.date)}</td>
                       <td>{flight.flightNumber || "—"}</td>
                       <td className="route-cell">
                         <span className="route-content">
@@ -305,11 +315,23 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
                       <td>{formatTime(flight.departureTime)}</td>
                       <td>{formatTime(flight.arrivalTime)}</td>
                       <td>{flight.board || "—"}</td>
+                      <td>
+                        {eventColor ? (
+                          <span
+                            className="event-flight-badge"
+                            title={flightEventsTitle(flight)}
+                            style={{ background: COLOR_STYLES[eventColor].bg, color: COLOR_STYLES[eventColor].text, borderColor: COLOR_STYLES[eventColor].border }}
+                          >
+                            {flight.events.length}
+                          </span>
+                        ) : "—"}
+                      </td>
                       {metricDefinitions.map((metric) => (
                         <td key={metric.key}>{formatMetric(flight.metrics[metric.key], metric.key, true)}</td>
                       ))}
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -318,5 +340,7 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
         </div>}
       </div>
     </div>
+    {selectedFlight && <FlightDetailCard flight={selectedFlight} onClose={() => setSelectedFlight(null)} />}
+    </>
   );
 }
