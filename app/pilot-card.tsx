@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatFlightDate, formatMetric, metricDefinitions, normalizeFlightDate, type Flight, type FlightMetricKey, type PilotSummary } from "./flight-data";
+import { PilotRadarChart, type PilotRadarAxis } from "./histogram";
 
 interface PilotCardProps {
   pilot: PilotSummary;
@@ -12,7 +13,10 @@ interface PilotCardProps {
 type FlightSortKey = "date" | "flightNumber" | "route" | "departureTime" | "arrivalTime" | "board" | FlightMetricKey;
 type SortDirection = "asc" | "desc";
 
+type PilotCardTab = "stats" | "flights";
+
 export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
+  const [tab, setTab] = useState<PilotCardTab>("stats");
   const [selectedMetric, setSelectedMetric] = useState<FlightMetricKey>("landingNy");
   const [flightSearch, setFlightSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -108,6 +112,17 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
     }));
   };
 
+  const radarAxes = useMemo<PilotRadarAxis[]>(() => metricDefinitions.map((item) => ({
+    key: item.key,
+    label: item.shortLabel,
+    unit: item.unit,
+    digits: item.digits,
+    pilotMin: pilot.minMetrics[item.key],
+    pilotMax: pilot.maxMetrics[item.key],
+    pilotAvg: pilot.metrics[item.key],
+    typeAvg: pilot.typeMetrics[item.key],
+  })), [pilot]);
+
   const pilotAverage = pilot.metrics[selectedMetric];
   const typeAverage = pilot.typeMetrics[selectedMetric];
   const delta = pilotAverage !== null && typeAverage !== null ? pilotAverage - typeAverage : null;
@@ -128,8 +143,13 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
           <button className="pilot-card-close" onClick={onClose} aria-label="Закрыть">×</button>
         </div>
 
+        <div className="pilot-card-tabs">
+          <button type="button" className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}>Статистика</button>
+          <button type="button" className={tab === "flights" ? "active" : ""} onClick={() => setTab("flights")}>Рейсы пилота ({pilotFlights.length})</button>
+        </div>
+
         {/* Statistics Summary */}
-        <div className="pilot-card-stats-summary">
+        {tab === "stats" && <div className="pilot-card-stats-summary">
           <div className="pilot-card-stats-header">
             <div>
               <span>Сводная статистика</span>
@@ -170,9 +190,22 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
               </dl>
             </article>
           </div>
-        </div>
+
+          <article className="chart-card pilot-card-radar">
+            <div className="chart-head">
+              <div><span>Все показатели</span><h2>Профиль пилота</h2></div>
+              <ul className="chart-legend">
+                <li><i className="pilot-radar-legend-pilot" />{pilot.name}</li>
+                <li><i className="pilot-radar-legend-type" />Среднее по типу ВС</li>
+              </ul>
+            </div>
+            <p className="note">Каждая ось — свой показатель: центр — минимум пилота, край — его максимум. Если среднее по типу ВС выходит за пределы этого диапазона, значение подписано за пределами круга.</p>
+            <PilotRadarChart axes={radarAxes} selectedMetric={selectedMetric} pilotLabel={pilot.name} baselineLabel="Среднее по типу ВС" />
+          </article>
+        </div>}
 
         {/* Flight Filters */}
+        {tab === "flights" && <div className="pilot-card-flights-panel">
         <div className="pilot-card-filters">
           <div className="pilot-card-filter">
             <label htmlFor="pilot-flight-search"><span>Поиск рейса</span></label>
@@ -282,6 +315,7 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
             </div>
           )}
         </div>
+        </div>}
       </div>
     </div>
   );

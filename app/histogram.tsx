@@ -431,6 +431,168 @@ export function comparisonRangeSvg(rows: StatisticRow[], metric: FlightMetricKey
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Среднее, диапазон и ${escapeXml(baselineLabel.toLocaleLowerCase("ru-RU"))}"><rect width="${width}" height="${height}" fill="#fff"/>${grid}${marks}</svg>`;
 }
 
+export type PilotRadarAxis = {
+  key: FlightMetricKey;
+  label: string;
+  unit: string;
+  digits: number;
+  pilotMin: number | null;
+  pilotMax: number | null;
+  pilotAvg: number | null;
+  typeAvg: number | null;
+};
+
+const RADAR_R = 118;
+const RADAR_CENTER = { x: 250, y: 198 };
+const RADAR_SIZE = { width: 500, height: 470 };
+const RADAR_OVERFLOW_CAP = 1.1;
+const RADAR_LABEL_R = RADAR_R * 1.24;
+const RADAR_UNDERFLOW_R = RADAR_R * 0.09;
+const RADAR_RINGS = [0.25, 0.5, 0.75, 1];
+
+const radarPolar = (angle: number, r: number) => ({
+  x: RADAR_CENTER.x + r * Math.cos(angle),
+  y: RADAR_CENTER.y + r * Math.sin(angle),
+});
+const radarLabelAnchor = (angle: number): "start" | "middle" | "end" => {
+  const cos = Math.cos(angle);
+  if (cos > 0.25) return "start";
+  if (cos < -0.25) return "end";
+  return "middle";
+};
+const radarLabelDy = (angle: number) => {
+  const sin = Math.sin(angle);
+  if (sin < -0.35) return -6;
+  if (sin > 0.35) return 15;
+  return 4;
+};
+
+export function PilotRadarChart({
+  axes,
+  selectedMetric,
+  pilotLabel,
+  baselineLabel,
+}: {
+  axes: PilotRadarAxis[];
+  selectedMetric: FlightMetricKey;
+  pilotLabel: string;
+  baselineLabel: string;
+}) {
+  const n = axes.length;
+  if (n < 3) return <p className="note">Недостаточно показателей для диаграммы.</p>;
+  const angleStep = (Math.PI * 2) / n;
+  const angleAt = (index: number) => -Math.PI / 2 + index * angleStep;
+
+  const pilotPoints: Array<{ x: number; y: number; axis: PilotRadarAxis }> = [];
+  const typePoints: Array<{ x: number; y: number; axis: PilotRadarAxis; overflow: "high" | "low" | null }> = [];
+
+  axes.forEach((axis, index) => {
+    if (axis.pilotMin === null || axis.pilotMax === null || axis.pilotAvg === null) return;
+    const angle = angleAt(index);
+    const span = axis.pilotMax - axis.pilotMin;
+    const pilotT = span === 0 ? 0.5 : (axis.pilotAvg - axis.pilotMin) / span;
+    const pilotPoint = radarPolar(angle, RADAR_R * pilotT);
+    pilotPoints.push({ x: pilotPoint.x, y: pilotPoint.y, axis });
+
+    if (axis.typeAvg === null) return;
+    let overflow: "high" | "low" | null = null;
+    let typeR: number;
+    if (span === 0) {
+      if (axis.typeAvg === axis.pilotMin) typeR = RADAR_R * 0.5;
+      else if (axis.typeAvg > axis.pilotMin) { overflow = "high"; typeR = RADAR_R * RADAR_OVERFLOW_CAP; }
+      else { overflow = "low"; typeR = RADAR_UNDERFLOW_R; }
+    } else {
+      const rawR = RADAR_R * ((axis.typeAvg - axis.pilotMin) / span);
+      if (rawR > RADAR_R) { overflow = "high"; typeR = Math.min(rawR, RADAR_R * RADAR_OVERFLOW_CAP); }
+      else if (rawR < 0) { overflow = "low"; typeR = RADAR_UNDERFLOW_R; }
+      else typeR = rawR;
+    }
+    const typePoint = radarPolar(angle, typeR);
+    typePoints.push({ x: typePoint.x, y: typePoint.y, axis, overflow });
+  });
+
+  const pilotPath = pilotPoints.length > 2 ? `M ${pilotPoints.map((p) => `${p.x} ${p.y}`).join(" L ")} Z` : "";
+  const typePath = typePoints.length > 2 ? `M ${typePoints.map((p) => `${p.x} ${p.y}`).join(" L ")} Z` : "";
+
+  return (
+    <div className="chart-scroll">
+      <div className="chart-plot" style={{ minWidth: Math.max(RADAR_SIZE.width, 420) }}>
+        <svg
+          viewBox={`0 0 ${RADAR_SIZE.width} ${RADAR_SIZE.height}`}
+          role="img"
+          aria-label={`Личная статистика ${pilotLabel} по всем показателям в сравнении со средним по типу ВС`}
+          preserveAspectRatio="xMidYMid meet"
+        >
+          {RADAR_RINGS.map((ring) => (
+            <circle key={ring} cx={RADAR_CENTER.x} cy={RADAR_CENTER.y} r={RADAR_R * ring} fill="none" stroke={GRID} strokeWidth={ring === 1 ? 1.4 : 1} />
+          ))}
+          {axes.map((axis, index) => {
+            const angle = angleAt(index);
+            const tip = radarPolar(angle, RADAR_R);
+            const selected = axis.key === selectedMetric;
+            return (
+              <line
+                key={axis.key}
+                x1={RADAR_CENTER.x}
+                y1={RADAR_CENTER.y}
+                x2={tip.x}
+                y2={tip.y}
+                stroke={selected ? NAVY : GRID}
+                strokeWidth={selected ? 1.6 : 1}
+                opacity={selected ? 0.55 : 1}
+              />
+            );
+          })}
+
+          {typePath && <path d={typePath} fill="none" stroke={NAVY} strokeWidth="2" strokeDasharray="5 4" strokeLinejoin="round" />}
+          {pilotPath && <path d={pilotPath} fill={RED} fillOpacity="0.16" stroke={RED} strokeWidth="2" strokeLinejoin="round" />}
+
+          {typePoints.map(({ x, y, axis, overflow }) => (
+            <g key={`type-${axis.key}`}>
+              <path d={`M ${x} ${y - 5} L ${x + 5} ${y} L ${x} ${y + 5} L ${x - 5} ${y} Z`} fill="white" stroke={NAVY} strokeWidth="2" />
+              <title>{`${axis.label}: среднее по типу ВС ${formatMetric(axis.typeAvg, axis.key, true)}${overflow ? " (вне диапазона пилота)" : ""}`}</title>
+            </g>
+          ))}
+
+          {pilotPoints.map(({ x, y, axis }) => (
+            <g key={`pilot-${axis.key}`}>
+              <circle cx={x} cy={y} r="4.5" fill={RED} stroke="white" strokeWidth="1.6" />
+              <title>{`${axis.label}: ${pilotLabel} — мин. ${formatMetric(axis.pilotMin, axis.key, true)}, среднее ${formatMetric(axis.pilotAvg, axis.key, true)}, макс. ${formatMetric(axis.pilotMax, axis.key, true)}`}</title>
+            </g>
+          ))}
+
+          {axes.map((axis, index) => {
+            const angle = angleAt(index);
+            const pos = radarPolar(angle, RADAR_LABEL_R);
+            const selected = axis.key === selectedMetric;
+            const anchor = radarLabelAnchor(angle);
+            const baseDy = radarLabelDy(angle);
+            const hasPilotValue = axis.pilotAvg !== null;
+            const typeEntry = typePoints.find((p) => p.axis.key === axis.key);
+            return (
+              <g key={`label-${axis.key}`}>
+                <text x={pos.x} y={pos.y} textAnchor={anchor} dy={baseDy} fill={selected ? RED : INK} fontSize={selected ? 11 : 10} fontWeight={selected ? 800 : 700}>
+                  {axis.label}
+                </text>
+                {hasPilotValue && (
+                  <text x={pos.x} y={pos.y} textAnchor={anchor} dy={baseDy + 15} fill={RED} fontSize="9" fontWeight="700">
+                    {`● ${formatMetric(axis.pilotAvg, axis.key, true)}`}
+                  </text>
+                )}
+                {typeEntry && (
+                  <text x={pos.x} y={pos.y} textAnchor={anchor} dy={baseDy + 29} fill={NAVY} fontSize="9" fontWeight="700">
+                    {`${typeEntry.overflow ? (typeEntry.overflow === "high" ? "▲ " : "▼ ") : "◇ "}${formatMetric(axis.typeAvg, axis.key, true)}`}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 export function normalizedDistributionSvg(bins: MultiHistogramBin[], metric: FlightMetricKey, series: ChartSeries[], width = 860, height = 250) {
   if (!bins.length || !series.length) return "";
   const totals = Object.fromEntries(series.map((item) => [item.id, bins.reduce((sum, bin) => sum + (bin.counts[item.id] ?? 0), 0)]));
