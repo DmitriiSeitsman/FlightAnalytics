@@ -521,6 +521,8 @@ export type PilotSummary = {
   medianMetrics: Metrics;
   maxMetrics: Metrics;
   typeMetrics: Metrics;
+  typeMinMetrics: Metrics;
+  typeMaxMetrics: Metrics;
 };
 export function summarizePilots(flights: Flight[]): PilotSummary[] {
   const groups = new Map<string, { member: CrewMember; aircraftType: string; flights: Flight[] }>();
@@ -530,7 +532,7 @@ export function summarizePilots(flights: Flight[]): PilotSummary[] {
     group.flights.push(flight);
     groups.set(key, group);
   }
-  const baselines = new Map(summarizeFlights(flights, "aircraftType").map((item) => [item.label, item.metrics]));
+  const baselines = new Map(summarizeFlights(flights, "aircraftType").map((item) => [item.label, item]));
   return [...groups.values()].map(({ member, aircraftType, flights: items }) => {
     const values = (key: FlightMetricKey) => items.map((item) => item.metrics[key]);
     return {
@@ -541,7 +543,9 @@ export function summarizePilots(flights: Flight[]): PilotSummary[] {
       minMetrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, minimum(values(key))])) as Metrics,
       medianMetrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, median(values(key))])) as Metrics,
       maxMetrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, maximum(values(key))])) as Metrics,
-      typeMetrics: baselines.get(aircraftType)!,
+      typeMetrics: baselines.get(aircraftType)!.metrics,
+      typeMinMetrics: baselines.get(aircraftType)!.minMetrics,
+      typeMaxMetrics: baselines.get(aircraftType)!.maxMetrics,
     };
   }).sort((a, b) => {
     const flightDiff = b.flights - a.flights;

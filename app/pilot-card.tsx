@@ -126,6 +126,8 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
     pilotMax: pilot.maxMetrics[item.key],
     pilotAvg: pilot.metrics[item.key],
     typeAvg: pilot.typeMetrics[item.key],
+    typeMin: pilot.typeMinMetrics[item.key],
+    typeMax: pilot.typeMaxMetrics[item.key],
   })), [pilot]);
 
   const pilotAverage = pilot.metrics[selectedMetric];

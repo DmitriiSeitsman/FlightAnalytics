@@ -440,14 +440,14 @@ export type PilotRadarAxis = {
   pilotMax: number | null;
   pilotAvg: number | null;
   typeAvg: number | null;
+  typeMin: number | null;
+  typeMax: number | null;
 };
 
 const RADAR_R = 118;
 const RADAR_CENTER = { x: 250, y: 198 };
 const RADAR_SIZE = { width: 500, height: 470 };
-const RADAR_OVERFLOW_CAP = 1.1;
 const RADAR_LABEL_R = RADAR_R * 1.24;
-const RADAR_UNDERFLOW_R = RADAR_R * 0.09;
 const RADAR_RINGS = [0.25, 0.5, 0.75, 1];
 
 const radarPolar = (angle: number, r: number) => ({
@@ -484,31 +484,29 @@ export function PilotRadarChart({
   const angleAt = (index: number) => -Math.PI / 2 + index * angleStep;
 
   const pilotPoints: Array<{ x: number; y: number; axis: PilotRadarAxis }> = [];
-  const typePoints: Array<{ x: number; y: number; axis: PilotRadarAxis; overflow: "high" | "low" | null }> = [];
+  const typePoints: Array<{ x: number; y: number; axis: PilotRadarAxis }> = [];
 
   axes.forEach((axis, index) => {
-    if (axis.pilotMin === null || axis.pilotMax === null || axis.pilotAvg === null) return;
+    if (axis.typeMin === null || axis.typeMax === null) return;
     const angle = angleAt(index);
-    const span = axis.pilotMax - axis.pilotMin;
-    const pilotT = span === 0 ? 0.5 : (axis.pilotAvg - axis.pilotMin) / span;
-    const pilotPoint = radarPolar(angle, RADAR_R * pilotT);
-    pilotPoints.push({ x: pilotPoint.x, y: pilotPoint.y, axis });
+    // Шкала оси всегда опирается на диапазон типа ВС (не пилота), с запасом 10% с каждой
+    // стороны, чтобы деления и точки не упирались в центр/обод. Пилот — подмножество типа,
+    // поэтому его точки физически всегда попадают внутрь этого диапазона.
+    const rawSpan = axis.typeMax - axis.typeMin;
+    const pad = rawSpan !== 0 ? rawSpan * 0.1 : (axis.typeMax !== 0 ? Math.abs(axis.typeMax) * 0.1 : 1);
+    const scaleMin = axis.typeMin - pad;
+    const scaleSpan = rawSpan + pad * 2;
+    const radiusFor = (value: number) => Math.min(RADAR_R, Math.max(0, RADAR_R * ((value - scaleMin) / scaleSpan)));
 
-    if (axis.typeAvg === null) return;
-    let overflow: "high" | "low" | null = null;
-    let typeR: number;
-    if (span === 0) {
-      if (axis.typeAvg === axis.pilotMin) typeR = RADAR_R * 0.5;
-      else if (axis.typeAvg > axis.pilotMin) { overflow = "high"; typeR = RADAR_R * RADAR_OVERFLOW_CAP; }
-      else { overflow = "low"; typeR = RADAR_UNDERFLOW_R; }
-    } else {
-      const rawR = RADAR_R * ((axis.typeAvg - axis.pilotMin) / span);
-      if (rawR > RADAR_R) { overflow = "high"; typeR = Math.min(rawR, RADAR_R * RADAR_OVERFLOW_CAP); }
-      else if (rawR < 0) { overflow = "low"; typeR = RADAR_UNDERFLOW_R; }
-      else typeR = rawR;
+    if (axis.pilotAvg !== null) {
+      const pilotPoint = radarPolar(angle, radiusFor(axis.pilotAvg));
+      pilotPoints.push({ x: pilotPoint.x, y: pilotPoint.y, axis });
     }
-    const typePoint = radarPolar(angle, typeR);
-    typePoints.push({ x: typePoint.x, y: typePoint.y, axis, overflow });
+
+    if (axis.typeAvg !== null) {
+      const typePoint = radarPolar(angle, radiusFor(axis.typeAvg));
+      typePoints.push({ x: typePoint.x, y: typePoint.y, axis });
+    }
   });
 
   const pilotPath = pilotPoints.length > 2 ? `M ${pilotPoints.map((p) => `${p.x} ${p.y}`).join(" L ")} Z` : "";
@@ -547,10 +545,10 @@ export function PilotRadarChart({
           {typePath && <path d={typePath} fill="none" stroke={NAVY} strokeWidth="2" strokeDasharray="5 4" strokeLinejoin="round" />}
           {pilotPath && <path d={pilotPath} fill={RED} fillOpacity="0.16" stroke={RED} strokeWidth="2" strokeLinejoin="round" />}
 
-          {typePoints.map(({ x, y, axis, overflow }) => (
+          {typePoints.map(({ x, y, axis }) => (
             <g key={`type-${axis.key}`}>
               <path d={`M ${x} ${y - 5} L ${x + 5} ${y} L ${x} ${y + 5} L ${x - 5} ${y} Z`} fill="white" stroke={NAVY} strokeWidth="2" />
-              <title>{`${axis.label}: среднее по типу ВС ${formatMetric(axis.typeAvg, axis.key, true)}${overflow ? " (вне диапазона пилота)" : ""}`}</title>
+              <title>{`${axis.label}: среднее по типу ВС ${formatMetric(axis.typeAvg, axis.key, true)}`}</title>
             </g>
           ))}
 
@@ -581,7 +579,7 @@ export function PilotRadarChart({
                 )}
                 {typeEntry && (
                   <text x={pos.x} y={pos.y} textAnchor={anchor} dy={baseDy + 29} fill={NAVY} fontSize="9" fontWeight="700">
-                    {`${typeEntry.overflow ? (typeEntry.overflow === "high" ? "▲ " : "▼ ") : "◇ "}${formatMetric(axis.typeAvg, axis.key, true)}`}
+                    {`◇ ${formatMetric(axis.typeAvg, axis.key, true)}`}
                   </text>
                 )}
               </g>
