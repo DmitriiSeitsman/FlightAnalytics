@@ -12,8 +12,37 @@ export type FlightMetricKey = typeof metricDefinitions[number]["key"];
 export type Metrics = Record<FlightMetricKey, number | null>;
 export type SheetRow = Record<string, unknown>;
 type CrewMember = { code: string; name: string; role: "КВС" | "2П" };
-export type Flight = { key: string; aircraftType: string; departure: string; arrival: string; crew: CrewMember[]; metrics: Metrics; flightNumber: string; date: string; departureTime: string; arrivalTime: string; board: string };
-export type ImportResult = { flights: Flight[]; sourceRows: number; duplicatesRemoved: number; duplicateGroups: number; conflictingDuplicateGroups: number };
+export type Flight = { key: string; aircraftType: string; departure: string; arrival: string; crew: CrewMember[]; metrics: Metrics; flightNumber: string; date: string; departureTime: string; arrivalTime: string; board: string; events: Event[] };
+
+export type EventColor = "clRed" | "clOrange" | "clBlack" | "clGreen" | "clOlive" | "clFuchsia" | "unknown";
+export type EventParameter = { name: string; max: string; min: string };
+export type Event = {
+  id: string;
+  text: string;
+  color: EventColor;
+  pilotCode: string | null;
+  pilotName: string | null;
+  pilotRole: "КВС" | "2П" | null;
+  date: string;
+  flightNumber: string;
+  flightId: string;
+  phase: string;
+  duration: string;
+  parameters: EventParameter[];
+};
+export type ImportResult = { 
+  flights: Flight[]; 
+  sourceRows: number; 
+  duplicatesRemoved: number; 
+  duplicateGroups: number; 
+  conflictingDuplicateGroups: number; 
+  events: Event[];
+  eventsMergeStats?: {
+    mergedCount: number;
+    unmergedCount: number;
+    unmergedReasons: Map<string, number>;
+  };
+};
 
 const validFlightDateKey = (year: number, month: number, day: number) => {
   const date = new Date(Date.UTC(year, month - 1, day));
@@ -40,6 +69,14 @@ export function formatFlightDate(value: string | null | undefined) {
 }
 
 const required = ["ID_Poleta", "Nazvanie_Aeroporta_Vzleta", "Nazvanie_Aeroporta_Posadki", "FIO_KVS", "Kod_KVS", "FIO_2P", "Kod_2P", "Bort", "Tip_VS", "Reys", "Data_Poleta", "Vremya_Vzleta", "Vremya_Posadki", "Tangazh_Pri_Otrive", "Eshelon_1", "Skorost_Vhoda_V_Glissadu", "Visota_Otklyucheniya_Avtopilota", "Rasstoyanie_proleta_ot_torca_VPP_do_kasaniya", "Vremya_proleta_ot_torca_VPP_do_kasaniya", "Vertikalnaya_Peregruzka_Na_Posadke", "Skorost_Viklyucheniya_Reversa"];
+const eventsRequired = ["Text_Sobitiya", "Color", "Kod_KVS", "FIO_KVS", "Data_Poleta", "Reys"];
+export const shortenPilotName = (fio: string): string => {
+  const parts = fio.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "";
+  const [surname, ...rest] = parts;
+  const initials = rest.map((part) => `${part.charAt(0).toLocaleUpperCase("ru-RU")}.`).join("");
+  return initials ? `${surname} ${initials}` : surname;
+};
 const text = (value: unknown): string => { if (value == null) return ""; if (value instanceof Date) return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }).format(value); if (typeof value === "object") { const item = value as { text?: unknown; result?: unknown; richText?: Array<{ text?: unknown }> }; if (item.text !== undefined) return text(item.text); if (item.result !== undefined) return text(item.result); if (item.richText) return item.richText.map((part) => text(part.text)).join("").trim(); } return String(value).trim(); };
 const number = (value: unknown) => { if (typeof value === "number") return Number.isFinite(value) ? value : null; const source = text(value); const parsed = Number(source.replace(/\s/g, "").replace(",", ".")); return source && Number.isFinite(parsed) ? parsed : null; };
 const presentNumbers = (values: Array<number | null>) => values.filter((item): item is number => item !== null && Number.isFinite(item));
@@ -67,12 +104,214 @@ const metrics = (row: SheetRow): Metrics => ({ takeoffPitch: number(row.Tangazh_
 const flightKey = (row: SheetRow, index: number) => { const parts = [row.Data_Poleta, row.Vremya_Vzleta, row.Vremya_Posadki, row.Reys, row.Bort].map((item) => text(item).toLocaleLowerCase("ru-RU")); return parts.filter(Boolean).length >= 4 ? parts.join("|") : `row:${text(row.ID_Poleta) || index}`; };
 const crew = (rows: SheetRow[]) => { const members = new Map<string, CrewMember>(); for (const row of rows) for (const [role, nameKey, codeKey] of [["КВС", "FIO_KVS", "Kod_KVS"], ["2П", "FIO_2P", "Kod_2P"]] as const) { const name = text(row[nameKey]); const code = text(row[codeKey]); if (name && code) members.set(`${role}:${code}`, { role, name, code }); } return [...members.values()]; };
 
+export function parseEventRows(rows: SheetRow[], headers: string[]): Event[] {
+  const missing = eventsRequired.filter((header) => !headers.includes(header));
+  if (missing.length) throw new Error(`В файле событий не найдены обязательные столбцы: ${missing.join(", ")}`);
+
+  // Группируем строки по ID_Sobitiya
+  const eventGroups = new Map<string, SheetRow[]>();
+  rows.forEach((row) => {
+    const eventId = text(row.ID_Sobitiya);
+    if (eventId) {
+      if (!eventGroups.has(eventId)) {
+        eventGroups.set(eventId, []);
+      }
+      eventGroups.get(eventId)!.push(row);
+    }
+  });
+  
+  const events: Event[] = [];
+  
+  // Обрабатываем каждую группу как одно событие
+  eventGroups.forEach((groupRows, eventId) => {
+    const firstRow = groupRows[0];
+    const eventText = text(firstRow.Text_Sobitiya);
+    const rawColor = text(firstRow.Color);
+    
+    // Пропускаем строки без события
+    if (!eventText || !rawColor || rawColor === "null") return;
+    
+    // Безопасное определение цвета
+    const color: EventColor = ["clRed", "clOrange", "clBlack", "clGreen", "clOlive", "clFuchsia"].includes(rawColor) 
+      ? rawColor as EventColor 
+      : "unknown";
+    
+    const kodKVS = text(firstRow.Kod_KVS);
+    const fioKVS = text(firstRow.FIO_KVS);
+    const date = text(firstRow.Data_Poleta);
+    const reys = text(firstRow.Reys);
+
+    // Табельный номер и ФИО пилота берём из Kod_KVS/FIO_KVS: колонка Imya_Personala
+    // содержит идентификатор оператора/аналитика, а не пилота, и не совпадает
+    // с табельными номерами КВС/2П ни в одной строке реальных выгрузок.
+    const pilotCode: string | null = kodKVS || null;
+    const pilotName: string | null = fioKVS || null;
+    const pilotRole: "КВС" | "2П" | null = kodKVS ? "КВС" : null;
+    
+    // Собираем все параметры из всех строк группы
+    const parameters: EventParameter[] = [];
+    groupRows.forEach((row) => {
+      if (row.Parametr_1) {
+        parameters.push({
+          name: text(row.Parametr_1),
+          max: text(row.Max_Parametera_1),
+          min: text(row.Min_Parametera_1)
+        });
+      }
+      if (row.Parametr_2) {
+        parameters.push({
+          name: text(row.Parametr_2),
+          max: text(row.Max_Parametera_2),
+          min: text(row.Min_Parametera_2)
+        });
+      }
+    });
+    
+    events.push({
+      id: eventId,
+      text: eventText,
+      color,
+      pilotCode,
+      pilotName,
+      pilotRole,
+      date,
+      flightNumber: reys,
+      flightId: text(firstRow.ID_Poleta_1) || text(firstRow.ID_Poleta),
+      phase: text(firstRow.Faza_Nachala_Sobitiya),
+      duration: text(firstRow.Dlitelnost_Sobitiya),
+      parameters
+    });
+  });
+  
+  return events;
+}
+
+export function mergeEventsWithFlights(flights: Flight[], events: Event[]): { 
+  flights: Flight[]; 
+  mergedCount: number; 
+  unmergedCount: number;
+  unmergedReasons: Map<string, number>;
+} {
+  // Создаем индексы для быстрого поиска
+  const flightIndex = new Map<string, Flight[]>();
+  
+  // Индекс по дате + номеру рейса (основной ключ)
+  flights.forEach((flight) => {
+    const key = `${flight.date}-${flight.flightNumber}`;
+    if (!flightIndex.has(key)) {
+      flightIndex.set(key, []);
+    }
+    flightIndex.get(key)!.push(flight);
+  });
+  
+  // Создаем копии рейсов с пустыми массивами событий
+  const flightsWithEvents = flights.map(flight => ({ ...flight, events: [] as Event[] }));
+  
+  let mergedCount = 0;
+  let unmergedCount = 0;
+  const unmergedReasons = new Map<string, number>();
+  
+  const addUnmergedReason = (reason: string) => {
+    unmergedReasons.set(reason, (unmergedReasons.get(reason) || 0) + 1);
+  };
+  
+  // Распределяем события по рейсам с использованием индекса
+  events.forEach((event) => {
+    const eventKey = `${event.date}-${event.flightNumber}`;
+    const candidateFlights = flightIndex.get(eventKey);
+    
+    if (!candidateFlights || candidateFlights.length === 0) {
+      addUnmergedReason("Рейс не найден по дате и номеру");
+      unmergedCount++;
+      return;
+    }
+    
+    // Если несколько кандидатов, уточняем по борту или пилоту
+    let matchedFlight: Flight | null = null;
+    
+    if (candidateFlights.length === 1) {
+      matchedFlight = candidateFlights[0];
+    } else {
+      // Несколько рейсов с той же датой и номером - уточняем
+      for (const flight of candidateFlights) {
+        // Проверяем по пилоту в экипаже
+        if (event.pilotCode && event.pilotRole) {
+          const pilotInCrew = flight.crew.some(
+            (member) => member.code === event.pilotCode && member.role === event.pilotRole
+          );
+          if (pilotInCrew) {
+            matchedFlight = flight;
+            break;
+          }
+        }
+        
+        // Если пилот не определен, используем другие критерии
+        if (!matchedFlight && event.flightId) {
+          if (String(flight.key) === event.flightId || flight.key.includes(event.flightId)) {
+            matchedFlight = flight;
+            break;
+          }
+        }
+      }
+      
+      // Если всё равно не нашли, берём первый кандидат
+      if (!matchedFlight) {
+        matchedFlight = candidateFlights[0];
+        addUnmergedReason("Несколько кандидатов, выбран первый");
+      }
+    }
+    
+    if (matchedFlight) {
+      // Находим соответствующий рейс в flightsWithEvents
+      const targetFlight = flightsWithEvents.find(f => 
+        f.key === matchedFlight!.key && 
+        f.date === matchedFlight!.date && 
+        f.flightNumber === matchedFlight!.flightNumber
+      );
+      
+      if (targetFlight) {
+        // Проверяем пилота, если он указан в событии
+        if (event.pilotCode && event.pilotRole) {
+          const pilotInCrew = targetFlight.crew.some(
+            (member) => member.code === event.pilotCode && member.role === event.pilotRole
+          );
+          
+          if (pilotInCrew) {
+            targetFlight.events.push(event);
+            mergedCount++;
+          } else {
+            addUnmergedReason("Пилот не в экипаже");
+            unmergedCount++;
+          }
+        } else {
+          // Событие без пилота - добавляем к рейсу
+          targetFlight.events.push(event);
+          mergedCount++;
+        }
+      } else {
+        addUnmergedReason("Рейс не найден в целевом массиве");
+        unmergedCount++;
+      }
+    } else {
+      addUnmergedReason("Рейс не найден");
+      unmergedCount++;
+    }
+  });
+  
+  return {
+    flights: flightsWithEvents,
+    mergedCount,
+    unmergedCount,
+    unmergedReasons
+  };
+}
+
 export function parseFlightRows(rows: SheetRow[], headers: string[]): ImportResult {
   const missing = required.filter((header) => !headers.includes(header)); if (missing.length) throw new Error(`В файле не найдены обязательные столбцы: ${missing.join(", ")}`);
   const groups = new Map<string, SheetRow[]>(); rows.forEach((row, index) => { if (!Object.values(row).some((value) => text(value))) return; const key = flightKey(row, index + 2); groups.set(key, [...(groups.get(key) ?? []), row]); });
   let duplicateGroups = 0; let conflicts = 0;
-  const flights = [...groups.entries()].map(([key, group]): Flight => { if (group.length > 1) duplicateGroups += 1; const rowMetrics = group.map(metrics); if (group.length > 1 && metricDefinitions.some(({ key: metric }) => new Set(rowMetrics.map((item) => item[metric]).filter((item) => item !== null)).size > 1)) conflicts += 1; const representative = group.reduce((best, row) => Object.values(metrics(row)).filter((item) => item !== null).length > Object.values(metrics(best)).filter((item) => item !== null).length ? row : best); return { key, aircraftType: aircraftType(representative.Tip_VS), departure: airport(representative.Nazvanie_Aeroporta_Vzleta), arrival: airport(representative.Nazvanie_Aeroporta_Posadki), crew: crew(group), metrics: Object.fromEntries(metricDefinitions.map(({ key: metric }) => [metric, uniqueAverage(rowMetrics.map((item) => item[metric]))])) as Metrics, flightNumber: text(representative.Reys), date: text(representative.Data_Poleta), departureTime: text(representative.Vremya_Vzleta), arrivalTime: text(representative.Vremya_Posadki), board: text(representative.Bort) }; });
-  return { flights, sourceRows: rows.length, duplicatesRemoved: rows.length - flights.length, duplicateGroups, conflictingDuplicateGroups: conflicts };
+  const flights = [...groups.entries()].map(([key, group]): Flight => { if (group.length > 1) duplicateGroups += 1; const rowMetrics = group.map(metrics); if (group.length > 1 && metricDefinitions.some(({ key: metric }) => new Set(rowMetrics.map((item) => item[metric]).filter((item) => item !== null)).size > 1)) conflicts += 1; const representative = group.reduce((best, row) => Object.values(metrics(row)).filter((item) => item !== null).length > Object.values(metrics(best)).filter((item) => item !== null).length ? row : best); return { key, aircraftType: aircraftType(representative.Tip_VS), departure: airport(representative.Nazvanie_Aeroporta_Vzleta), arrival: airport(representative.Nazvanie_Aeroporta_Posadki), crew: crew(group), metrics: Object.fromEntries(metricDefinitions.map(({ key: metric }) => [metric, uniqueAverage(rowMetrics.map((item) => item[metric]))])) as Metrics, flightNumber: text(representative.Reys), date: text(representative.Data_Poleta), departureTime: text(representative.Vremya_Vzleta), arrivalTime: text(representative.Vremya_Posadki), board: text(representative.Bort), events: [] }; });
+  return { flights, sourceRows: rows.length, duplicatesRemoved: rows.length - flights.length, duplicateGroups, conflictingDuplicateGroups: conflicts, events: [] };
 }
 const metricSet = (items: Flight[]) => {
   const values = (key: FlightMetricKey) => items.map((item) => item.metrics[key]);
@@ -88,7 +327,14 @@ export type Summary = { label: string; flights: number; metrics: Metrics; minMet
 export function summarizeFlights(flights: Flight[], groupBy: "aircraftType" | "departure" | "arrival"): Summary[] {
   const groups = new Map<string, Flight[]>();
   flights.forEach((flight) => groups.set(flight[groupBy], [...(groups.get(flight[groupBy]) ?? []), flight]));
-  return [...groups].map(([label, items]) => ({ label, flights: items.length, ...metricSet(items) })).sort((a, b) => b.flights - a.flights || a.label.localeCompare(b.label, "ru"));
+  return [...groups].map(([label, items]) => ({ label, flights: items.length, ...metricSet(items) })).sort((a, b) => {
+    const flightDiff = b.flights - a.flights;
+    if (flightDiff !== 0) return flightDiff;
+    
+    const labelA = String(a.label || "");
+    const labelB = String(b.label || "");
+    return labelA.localeCompare(labelB, "ru");
+  });
 }
 
 export function formatMetric(value: number | null, key: FlightMetricKey, withUnit = false) {
@@ -266,5 +512,12 @@ export function summarizePilots(flights: Flight[]): PilotSummary[] {
       maxMetrics: Object.fromEntries(metricDefinitions.map(({ key }) => [key, maximum(values(key))])) as Metrics,
       typeMetrics: baselines.get(aircraftType)!,
     };
-  }).sort((a, b) => b.flights - a.flights || a.name.localeCompare(b.name, "ru"));
+  }).sort((a, b) => {
+    const flightDiff = b.flights - a.flights;
+    if (flightDiff !== 0) return flightDiff;
+    
+    const nameA = String(a.name || "");
+    const nameB = String(b.name || "");
+    return nameA.localeCompare(nameB, "ru");
+  });
 }

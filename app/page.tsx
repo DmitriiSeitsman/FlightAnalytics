@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { formatMetric, metricDefinitions, parseFlightRows, summarizeFlights, summarizePilots, type FlightMetricKey, type ImportResult, type SheetRow, type PilotSummary } from "./flight-data";
+import { formatMetric, metricDefinitions, parseFlightRows, parseEventRows, mergeEventsWithFlights, summarizeFlights, summarizePilots, type FlightMetricKey, type ImportResult, type SheetRow, type PilotSummary } from "./flight-data";
 import { StatisticsView } from "./statistics-view";
 import { PilotCard } from "./pilot-card";
+import { EventsAnalytics } from "./events-analytics";
 
-type View = "aircraftType" | "departure" | "arrival" | "pilots" | "statistics";
+type View = "aircraftType" | "departure" | "arrival" | "pilots" | "statistics" | "events";
 type SortDirection = "asc" | "desc";
 type ImportProgress = { progress: number; title: string; detail: string };
 type SummarySortKey = "label" | "flights" | FlightMetricKey;
@@ -28,8 +29,10 @@ const compareValues = (left: string | number | null, right: string | number | nu
 };
 export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const eventsInputRef = useRef<HTMLInputElement>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [fileName, setFileName] = useState("");
+  const [eventsFileName, setEventsFileName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
@@ -81,10 +84,72 @@ export default function Home() {
     }
   };
 
+  const importEventsFile = async (file: File) => {
+    if (!result) {
+      setError("Сначала загрузите основной файл с рейсами");
+      return;
+    }
+    
+    const showProgress = async (progress: ImportProgress) => {
+      setImportProgress(progress);
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    };
+    
+    setLoading(true); setError(""); setEventsFileName(file.name);
+    try {
+      await showProgress({ progress: 8, title: "Подготавливаем файл событий", detail: "Проверяем формат и размер файла" });
+      if (!file.name.toLocaleLowerCase("ru-RU").endsWith(".xlsx")) throw new Error("Выберите файл Excel в формате .xlsx.");
+      
+      const ExcelJS = await import("exceljs");
+      await showProgress({ progress: 24, title: "Читаем Excel событий", detail: "Открываем книгу и первый лист" });
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(await file.arrayBuffer() as never);
+      const sheet = workbook.worksheets[0];
+      if (!sheet) throw new Error("В книге нет листа с данными.");
+      
+      await showProgress({ progress: 48, title: "Собираем события", detail: `Найдено строк: ${Math.max(0, sheet.rowCount - 1).toLocaleString("ru-RU")}` });
+      const headers: string[] = [];
+      sheet.getRow(1).eachCell({ includeEmpty: true }, (cell, column) => { headers[column - 1] = String(cell.text || cell.value || "").trim(); });
+      
+      const rows: SheetRow[] = [];
+      sheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return;
+        const item: SheetRow = {};
+        headers.forEach((header, index) => { if (header) item[header] = row.getCell(index + 1).value; });
+        rows.push(item);
+      });
+      
+      await showProgress({ progress: 72, title: "Парсим события", detail: "Извлекаем данные о событиях" });
+      const events = parseEventRows(rows, headers);
+      
+      await showProgress({ progress: 85, title: "Объединяем с рейсами", detail: "Сопоставляем события с рейсами по дате и номеру" });
+      const mergeResult = mergeEventsWithFlights(result.flights, events);
+      
+      await showProgress({ progress: 100, title: "Готово", detail: `${mergeResult.mergedCount.toLocaleString("ru-RU")} событий объединено, ${mergeResult.unmergedCount.toLocaleString("ru-RU")} не объединено` });
+      setResult({ 
+        ...result, 
+        flights: mergeResult.flights, 
+        events,
+        eventsMergeStats: {
+          mergedCount: mergeResult.mergedCount,
+          unmergedCount: mergeResult.unmergedCount,
+          unmergedReasons: mergeResult.unmergedReasons
+        }
+      });
+      await new Promise((resolve) => setTimeout(resolve, 450));
+    } catch (caught) {
+      console.error("Error importing events:", caught);
+      // Не удаляем основной результат при ошибке событий
+      setError(caught instanceof Error ? caught.message : "Не удалось прочитать файл событий.");
+    } finally {
+      setLoading(false); setImportProgress(null); if (eventsInputRef.current) eventsInputRef.current.value = "";
+    }
+  };
+
   const aircraftTypes = useMemo(() => [...new Set(result?.flights.map((item) => item.aircraftType) ?? [])].sort(), [result]);
   const airports = useMemo(() => [...new Set(result?.flights.flatMap((item) => [item.departure, item.arrival]) ?? [])].sort(), [result]);
   const flights = useMemo(() => (result?.flights ?? []).filter((flight) => (!aircraftType || flight.aircraftType === aircraftType) && (!airport || flight.departure === airport || flight.arrival === airport)), [aircraftType, airport, result]);
-  const summaries = useMemo(() => view === "pilots" || view === "statistics" ? [] : summarizeFlights(flights, view), [flights, view]);
+  const summaries = useMemo(() => view === "pilots" || view === "statistics" || view === "events" ? [] : summarizeFlights(flights, view), [flights, view]);
   const pilots = useMemo(() => summarizePilots(flights).filter((pilot) => pilot.flights >= minimumFlights && (!pilotSearch || `${pilot.name} ${pilot.code}`.toLocaleLowerCase("ru-RU").includes(pilotSearch.toLocaleLowerCase("ru-RU")))), [flights, minimumFlights, pilotSearch]);
   const selectedMetric = metricDefinitions.find((item) => item.key === pilotMetric)!;
   const sortedSummaries = useMemo(() => [...summaries].sort((left, right) => {
@@ -129,6 +194,33 @@ export default function Home() {
         <span className={`upload-icon${loading ? " loading" : ""}`}>{loading ? <span className="mini-spinner" /> : "↥"}</span><span><strong>{loading ? importProgress?.title ?? "Обрабатываем файл…" : result ? "Загрузить другой файл" : "Перетащите Excel сюда"}</strong><small>{fileName || "или нажмите, чтобы выбрать .xlsx"}</small></span>
       </button>
       <input ref={inputRef} className="hidden-input" type="file" accept=".xlsx" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file); }} />
+      
+      {result && result.events.length === 0 && (
+        <button className="upload upload-secondary" type="button" disabled={loading} onClick={() => eventsInputRef.current?.click()} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const file = event.dataTransfer.files[0]; if (file) void importEventsFile(file); }}>
+          <span className="upload-icon">📋</span><span><strong>Загрузить файл событий</strong><small>{eventsFileName || "или перетащите Excel с событиями"}</small></span>
+        </button>
+      )}
+      
+      {result && result.eventsMergeStats && (
+        <div className="events-merge-stats">
+          <span>Статистика объединения:</span>
+          <div>
+            <strong>{result.eventsMergeStats.mergedCount}</strong> объединено
+          </div>
+          <div>
+            <strong>{result.eventsMergeStats.unmergedCount}</strong> не объединено
+          </div>
+          {result.eventsMergeStats.unmergedReasons.size > 0 && (
+            <div className="unmerged-reasons">
+              <span>Причины:</span>
+              {Array.from(result.eventsMergeStats.unmergedReasons.entries()).map(([reason, count]) => (
+                <span key={reason}>{reason}: {count}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <input ref={eventsInputRef} className="hidden-input" type="file" accept=".xlsx" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importEventsFile(file); }} />
       {loading && importProgress && <div className="processing" role="status" aria-live="polite" aria-label={`${importProgress.title}: ${importProgress.progress}%`}>
         <div className="processing-visual" aria-hidden="true"><span className="processing-ring" /><strong>{importProgress.progress}%</strong></div>
         <div className="processing-copy"><div><span>Обработка отчёта</span><strong>{importProgress.title}</strong><small>{importProgress.detail}</small></div><div className="processing-percent">{importProgress.progress}%</div>
@@ -149,9 +241,9 @@ export default function Home() {
           <label><span>Аэропорт маршрута</span><select value={airport} onChange={(event) => setAirport(event.target.value)}><option value="">Все аэропорты</option>{airports.map((item) => <option key={item}>{item}</option>)}</select></label>
           <div><span>В выборке</span><strong>{flights.length.toLocaleString("ru-RU")} рейсов</strong></div>
         </div>
-        <nav className="tabs" aria-label="Разрез аналитики">{([["aircraftType", "Типы ВС"], ["departure", "Аэродромы взлёта"], ["arrival", "Аэродромы посадки"], ["pilots", "Пилоты"], ["statistics", "Статистика"]] as Array<[View, string]>).map(([key, label]) => <button type="button" className={view === key ? "active" : ""} key={key} onClick={() => setView(key)}>{label}</button>)}</nav>
+        <nav className="tabs" aria-label="Разрез аналитики">{([["aircraftType", "Типы ВС"], ["departure", "Аэродромы взлёта"], ["arrival", "Аэродромы посадки"], ["pilots", "Пилоты"], ["statistics", "Статистика"], ...(result?.events && result.events.length > 0 ? [["events", "События"] as [View, string]] : [])] as Array<[View, string]>).map(([key, label]) => <button type="button" className={view === key ? "active" : ""} key={key} onClick={() => setView(key)}>{label}</button>)}</nav>
         {view !== "statistics" && <p className="sort-help">Отметьте галочками нужные столбцы. Цифры показывают порядок сортировки; стрелка меняет направление.<span className="mobile-table-hint">↔ Проведите по таблице влево, чтобы увидеть остальные столбцы.</span></p>}
-        {view === "statistics" ? <StatisticsView flights={flights} sourceFile={fileName} aircraftFilter={aircraftType} airportFilter={airport} /> : view === "pilots" ? <>
+        {view === "statistics" ? <StatisticsView flights={flights} sourceFile={fileName} aircraftFilter={aircraftType} airportFilter={airport} /> : view === "events" ? <EventsAnalytics flights={flights} events={result?.events || []} aircraftFilter={aircraftType} airportFilter={airport} /> : view === "pilots" ? <>
           <div className="pilot-controls"><label><span>Показатель</span><select value={pilotMetric} onChange={(event) => setPilotMetric(event.target.value as FlightMetricKey)}>{metricDefinitions.map((item) => <option value={item.key} key={item.key}>{item.label}</option>)}</select></label><label><span>Поиск пилота</span><input placeholder="ФИО или табельный номер" value={pilotSearch} onChange={(event) => setPilotSearch(event.target.value)} /></label><label><span>Минимум рейсов</span><input type="number" min="1" value={minimumFlights} onChange={(event) => setMinimumFlights(Math.max(1, Number(event.target.value) || 1))} /></label></div>
           <p className="note">В форме нет признака пилотирующего пилота (PF), поэтому показаны рейсы, где пилот входил в состав экипажа. Нажмите на строку пилота для просмотра детальной информации.</p>
           <div className="table-shell"><table className="pilot-table"><thead><tr>
