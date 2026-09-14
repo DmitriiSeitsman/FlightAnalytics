@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildStatisticRows, collectMetricSeries, histogramBins, multiHistogramBins, normalizeFlightDate, summarizePilots, type Flight } from "../app/flight-data.ts";
+import { buildStatisticRows, collectMetricSeries, histogramBins, multiHistogramBins, normalizeFlightDate, parseFlightRows, summarizePilots, type Flight, type SheetRow } from "../app/flight-data.ts";
 
 function flight(overrides: Partial<Omit<Flight, "metrics">> & Pick<Flight, "key" | "crew"> & { metrics?: Partial<Flight["metrics"]> }): Flight {
   const base: Flight = {
@@ -129,4 +129,37 @@ test("buildStatisticRows and histogramBins compare a selected group with others"
   assert.ok(bins.length >= 2);
   assert.equal(bins.reduce((sum, bin) => sum + bin.selected, 0), 2);
   assert.equal(bins.reduce((sum, bin) => sum + bin.others, 0), 1);
+});
+
+const importHeaders = ["ID_Poleta", "Nazvanie_Aeroporta_Vzleta", "Nazvanie_Aeroporta_Posadki", "FIO_KVS", "Kod_KVS", "FIO_2P", "Kod_2P", "Bort", "Tip_VS", "Reys", "Data_Poleta", "Vremya_Vzleta", "Vremya_Posadki", "Tangazh_Pri_Otrive", "Eshelon_1", "Skorost_Vhoda_V_Glissadu", "Visota_Otklyucheniya_Avtopilota", "Rasstoyanie_proleta_ot_torca_VPP_do_kasaniya", "Vremya_proleta_ot_torca_VPP_do_kasaniya", "Vertikalnaya_Peregruzka_Na_Posadke", "Skorost_Viklyucheniya_Reversa"];
+
+const importRow = (overrides: SheetRow): SheetRow => ({
+  ID_Poleta: "1", Nazvanie_Aeroporta_Vzleta: "Санкт-Петербург", Nazvanie_Aeroporta_Posadki: "Внуково",
+  FIO_KVS: "Иванов Иван Иванович", Kod_KVS: "111", FIO_2P: "Петров Пётр Петрович", Kod_2P: "222",
+  Bort: "RA-89185", Tip_VS: "RRJ-95", Reys: "6003", Data_Poleta: "01.08.2026",
+  Vremya_Vzleta: "04:51:47", Vremya_Posadki: "06:07:12", Tangazh_Pri_Otrive: 8.31,
+  ...overrides,
+});
+
+test("rows of one flight merge when a time is missing in some of them", () => {
+  const result = parseFlightRows([
+    importRow({ ID_Poleta: "179750", Vremya_Vzleta: null }),
+    importRow({ ID_Poleta: "180044" }),
+  ], importHeaders);
+
+  assert.equal(result.flights.length, 1);
+  // пустое время не должно затирать заполненное
+  assert.equal(result.flights[0].departureTime, "04:51:47");
+  assert.equal(result.flights[0].arrivalTime, "06:07:12");
+  assert.equal(result.duplicatesRemoved, 1);
+});
+
+test("rows with different filled times stay separate flights", () => {
+  const result = parseFlightRows([
+    importRow({ ID_Poleta: "1", Vremya_Vzleta: "04:51:47" }),
+    importRow({ ID_Poleta: "2", Vremya_Vzleta: "12:20:05" }),
+  ], importHeaders);
+
+  assert.equal(result.flights.length, 2);
+  assert.deepEqual(result.flights.map((item) => item.departureTime).sort(), ["04:51:47", "12:20:05"]);
 });

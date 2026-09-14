@@ -152,7 +152,48 @@ const aircraftType = (value: unknown) => {
   return source || "Не указан";
 };
 const metrics = (row: SheetRow): Metrics => ({ takeoffPitch: number(row.Tangazh_Pri_Otrive), flightLevel: average(Array.from({ length: 8 }, (_, index) => number(row[`Eshelon_${index + 1}`]))), glideslopeEntrySpeed: number(row.Skorost_Vhoda_V_Glissadu), autopilotDisconnectHeight: number(row.Visota_Otklyucheniya_Avtopilota), touchdownDistance: number(row.Rasstoyanie_proleta_ot_torca_VPP_do_kasaniya), thresholdToTouchdownTime: number(row.Vremya_proleta_ot_torca_VPP_do_kasaniya), landingNy: number(row.Vertikalnaya_Peregruzka_Na_Posadke), reverseOffSpeed: number(row.Skorost_Viklyucheniya_Reversa) });
-const flightKey = (row: SheetRow, index: number) => { const parts = [row.Data_Poleta, row.Vremya_Vzleta, row.Vremya_Posadki, row.Reys, row.Bort].map((item) => text(item).toLocaleLowerCase("ru-RU")); return parts.filter(Boolean).length >= 4 ? parts.join("|") : `row:${text(row.ID_Poleta) || index}`; };
+// Времена считаются совместимыми, если совпадают или отсутствуют в одной из строк:
+// в выгрузке время вылета бывает пустым у части строк одного и того же рейса.
+const timesCompatible = (left: string, right: string) => !left || !right || left === right;
+const flightIdentity = (row: SheetRow) => {
+  const parts = [row.Data_Poleta, row.Vremya_Vzleta, row.Vremya_Posadki, row.Reys, row.Bort].map((item) => text(item).toLocaleLowerCase("ru-RU"));
+  if (parts.filter(Boolean).length < 4) return null;
+  const [date, departure, arrival, flightNumber, board] = parts;
+  return { bucket: [date, flightNumber, board].join("|"), departure, arrival };
+};
+type FlightCluster = { key: string; departure: string; arrival: string; rows: SheetRow[] };
+const firstFilled = (group: SheetRow[], key: string) => { for (const row of group) { const value = text(row[key]); if (value) return value; } return ""; };
+
+// Один рейс — это строки с одинаковыми датой, номером и бортом, у которых времена не
+// противоречат друг другу. Строки с разным непустым временем остаются разными рейсами.
+function groupFlightRows(rows: SheetRow[]) {
+  const buckets = new Map<string, FlightCluster[]>();
+  const clusters: FlightCluster[] = [];
+  rows.forEach((row, index) => {
+    if (!Object.values(row).some((value) => text(value))) return;
+    const identity = flightIdentity(row);
+    if (!identity) {
+      clusters.push({ key: `row:${text(row.ID_Poleta) || index + 2}`, departure: "", arrival: "", rows: [row] });
+      return;
+    }
+    const bucket = buckets.get(identity.bucket) ?? [];
+    const match = bucket.find((cluster) => timesCompatible(cluster.departure, identity.departure) && timesCompatible(cluster.arrival, identity.arrival));
+    if (match) {
+      match.rows.push(row);
+      if (!match.departure) match.departure = identity.departure;
+      if (!match.arrival) match.arrival = identity.arrival;
+      return;
+    }
+    const created: FlightCluster = { key: identity.bucket, departure: identity.departure, arrival: identity.arrival, rows: [row] };
+    bucket.push(created);
+    buckets.set(identity.bucket, bucket);
+    clusters.push(created);
+  });
+  return clusters.map((cluster): [string, SheetRow[]] => [
+    cluster.key.startsWith("row:") ? cluster.key : `${cluster.key}|${cluster.departure}|${cluster.arrival}`,
+    cluster.rows,
+  ]);
+}
 const crew = (rows: SheetRow[]) => { const members = new Map<string, CrewMember>(); for (const row of rows) for (const [role, nameKey, codeKey] of [["КВС", "FIO_KVS", "Kod_KVS"], ["2П", "FIO_2P", "Kod_2P"]] as const) { const name = text(row[nameKey]); const code = text(row[codeKey]); if (name && code) members.set(`${role}:${code}`, { role, name, code }); } return [...members.values()]; };
 
 export function parseEventRows(rows: SheetRow[], headers: string[]): Event[] {
@@ -359,13 +400,12 @@ export function mergeEventsWithFlights(flights: Flight[], events: Event[]): {
 
 export function parseFlightRows(rows: SheetRow[], headers: string[]): ImportResult {
   const missing = required.filter((header) => !headers.includes(header)); if (missing.length) throw new Error(`В файле не найдены обязательные столбцы: ${missing.join(", ")}`);
-  const groups = new Map<string, SheetRow[]>(); rows.forEach((row, index) => { if (!Object.values(row).some((value) => text(value))) return; const key = flightKey(row, index + 2); groups.set(key, [...(groups.get(key) ?? []), row]); });
+  const groups = groupFlightRows(rows);
   let duplicateGroups = 0; let conflicts = 0; let routeConflicts = 0;
-  const flights = [...groups.entries()].map(([key, group]): Flight => {
+  const flights = groups.map(([key, group]): Flight => {
     if (group.length > 1) duplicateGroups += 1;
     const rowMetrics = group.map(metrics);
     if (group.length > 1 && metricDefinitions.some(({ key: metric }) => new Set(rowMetrics.map((item) => item[metric]).filter((item) => item !== null)).size > 1)) conflicts += 1;
-    const representative = group.reduce((best, row) => Object.values(metrics(row)).filter((item) => item !== null).length > Object.values(metrics(best)).filter((item) => item !== null).length ? row : best);
     // Аэропорты и тип ВС не входят в ключ группировки, поэтому у "сдвоенных" строк одного рейса
     // они могут разойтись (опечатка, запасной аэродром и т.п.). Берём самое частое значение по
     // группе, а не значение из representative — она выбрана по полноте метрик и может случайно
@@ -381,11 +421,13 @@ export function parseFlightRows(rows: SheetRow[], headers: string[]): ImportResu
       arrival: mostCommonValue(arrivalValues),
       crew: crew(group),
       metrics: Object.fromEntries(metricDefinitions.map(({ key: metric }) => [metric, uniqueAverage(rowMetrics.map((item) => item[metric]))])) as Metrics,
-      flightNumber: text(representative.Reys),
-      date: text(representative.Data_Poleta),
-      departureTime: text(representative.Vremya_Vzleta),
-      arrivalTime: text(representative.Vremya_Posadki),
-      board: text(representative.Bort),
+      // Опознавательные поля берём по первому непустому значению в группе: у части строк
+      // одного рейса время вылета пустое, и representative выбран по полноте метрик.
+      flightNumber: firstFilled(group, "Reys"),
+      date: firstFilled(group, "Data_Poleta"),
+      departureTime: firstFilled(group, "Vremya_Vzleta"),
+      arrivalTime: firstFilled(group, "Vremya_Posadki"),
+      board: firstFilled(group, "Bort"),
       events: [],
     };
   });
