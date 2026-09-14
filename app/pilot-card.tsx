@@ -2,14 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatFlightDate, formatMetric, metricDefinitions, normalizeFlightDate, worstEventColor, summarizeEventColors, type Flight, type FlightMetricKey, type PilotSummary } from "./flight-data";
-import { PilotRadarChart, type PilotRadarAxis } from "./histogram";
+import { PilotRangeProfile, type PilotProfileAxis } from "./histogram";
 import { COLOR_LABELS, COLOR_STYLES } from "./events-analytics";
 import { FlightDetailCard } from "./flight-detail-card";
+import { downloadPilotReportPdf } from "./report-export";
 
 interface PilotCardProps {
   pilot: PilotSummary;
   flights: Flight[];
   onClose: () => void;
+  aircraftFilter?: string;
+  airportFilter?: string;
 }
 
 type FlightSortKey = "date" | "flightNumber" | "route" | "departureTime" | "arrivalTime" | "board" | FlightMetricKey;
@@ -17,7 +20,9 @@ type SortDirection = "asc" | "desc";
 
 type PilotCardTab = "stats" | "flights";
 
-export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
+export function PilotCard({ pilot, flights, onClose, aircraftFilter = "", airportFilter = "" }: PilotCardProps) {
+  const [reportPending, setReportPending] = useState(false);
+  const [reportError, setReportError] = useState("");
   const [tab, setTab] = useState<PilotCardTab>("stats");
   const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<FlightMetricKey>("landingNy");
@@ -117,7 +122,7 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
     }));
   };
 
-  const radarAxes = useMemo<PilotRadarAxis[]>(() => metricDefinitions.map((item) => ({
+  const profileAxes = useMemo<PilotProfileAxis[]>(() => metricDefinitions.map((item) => ({
     key: item.key,
     label: item.shortLabel,
     unit: item.unit,
@@ -130,9 +135,37 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
     typeMax: pilot.typeMaxMetrics[item.key],
   })), [pilot]);
 
-  const pilotAverage = pilot.metrics[selectedMetric];
-  const typeAverage = pilot.typeMetrics[selectedMetric];
-  const delta = pilotAverage !== null && typeAverage !== null ? pilotAverage - typeAverage : null;
+  const avatarSrc = pilot.role === "КВС" ? "/pilot.png" : "/co-pilot.png";
+
+  const handleReport = async () => {
+    setReportPending(true);
+    setReportError("");
+    try {
+      const response = await fetch(avatarSrc);
+      if (!response.ok) throw new Error("Не удалось загрузить изображение для досье.");
+      const blob = await response.blob();
+      const avatarDataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error("Не удалось подготовить изображение."));
+        reader.readAsDataURL(blob);
+      });
+      await downloadPilotReportPdf({
+        generatedAt: new Date(),
+        pilot,
+        profileAxes,
+        selectedMetric,
+        flightsInScope: pilotFlights.length,
+        aircraftFilter,
+        airportFilter,
+        avatarDataUrl,
+      });
+    } catch (error) {
+      setReportError(error instanceof Error ? error.message : "Не удалось сформировать отчёт.");
+    } finally {
+      setReportPending(false);
+    }
+  };
 
   return (
     <>
@@ -140,16 +173,32 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
       <button type="button" className="pilot-card-backdrop" onClick={onClose} aria-label="Закрыть карточку пилота" />
       <div className="pilot-card" role="dialog" aria-modal="true" aria-labelledby="pilot-card-title">
         <div className="pilot-card-header">
-          <div>
-            <h2 id="pilot-card-title">{pilot.name}</h2>
-            <div className="pilot-card-meta">
-              <span className="pilot-card-role">{pilot.role}</span>
-              <span className="pilot-card-code">Табельный №: {pilot.code}</span>
-              <span className="pilot-card-aircraft">{pilot.aircraftType}</span>
+          <div className="pilot-card-identity">
+            <span className="pilot-card-avatar">
+              {/* next/image в проекте недоступен: пакета next нет в зависимостях. Силуэт весит 12 КБ и отдаётся статикой. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={avatarSrc} alt="" width="192" height="192" />
+            </span>
+            <div className="pilot-card-identity-text">
+              <h2 id="pilot-card-title">{pilot.name}</h2>
+              <div className="pilot-card-meta">
+                <span className={`pilot-card-role${pilot.role === "КВС" ? "" : " is-second"}`}>{pilot.role}</span>
+                <span className="pilot-card-code">Табельный № {pilot.code}</span>
+                <span className="pilot-card-aircraft">{pilot.aircraftType}</span>
+                <span className="pilot-card-count">{pilotFlights.length} рейсов в выборке</span>
+              </div>
             </div>
           </div>
-          <button className="pilot-card-close" onClick={onClose} aria-label="Закрыть">×</button>
+          <div className="pilot-card-actions">
+            <button type="button" className="pilot-card-report" onClick={() => void handleReport()} disabled={reportPending}>
+              <span className="pilot-card-report-icon" aria-hidden="true">PDF</span>
+              {reportPending ? "Готовим отчёт…" : "Сформировать отчет"}
+            </button>
+            <button className="pilot-card-close" onClick={onClose} aria-label="Закрыть">×</button>
+          </div>
         </div>
+
+        {reportError && <p className="pilot-card-report-error" role="alert">{reportError}</p>}
 
         <div className="pilot-card-tabs">
           <button type="button" className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}>Статистика</button>
@@ -161,7 +210,7 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
           <div className="pilot-card-stats-header">
             <div>
               <span>Сводная статистика</span>
-              <strong>Сравнение со средним по типу ВС</strong>
+              <strong>Пилот в сравнении с типом ВС</strong>
             </div>
             <select 
               value={selectedMetric} 
@@ -175,40 +224,67 @@ export function PilotCard({ pilot, flights, onClose }: PilotCardProps) {
             </select>
           </div>
           
-          <div className="pilot-card-stats-grid">
-            <article className="pilot-card-stat-card is-primary">
-              <span>Пилот</span>
-              <strong>{pilot.name}</strong>
-              <dl>
-                <div><dt>Среднее</dt><dd>{formatMetric(pilotAverage, selectedMetric, true)}</dd></div>
-                <div><dt>Минимум</dt><dd>{formatMetric(pilot.minMetrics[selectedMetric], selectedMetric, true)}</dd></div>
-                <div><dt>Максимум</dt><dd>{formatMetric(pilot.maxMetrics[selectedMetric], selectedMetric, true)}</dd></div>
-                <div><dt>Медиана</dt><dd>{formatMetric(pilot.medianMetrics[selectedMetric], selectedMetric, true)}</dd></div>
-              </dl>
-            </article>
-            
-            <article className="pilot-card-stat-card">
-              <span>Тип ВС</span>
-              <strong>{pilot.aircraftType}</strong>
-              <dl>
-                <div><dt>Среднее</dt><dd>{formatMetric(typeAverage, selectedMetric, true)}</dd></div>
-                <div><dt>Отклонение</dt><dd className={delta !== null && delta > 0 ? "positive" : delta !== null && delta < 0 ? "negative" : ""}>
-                  {delta === null ? "—" : `${delta > 0 ? "+" : ""}${formatMetric(delta, selectedMetric, true)}`}
-                </dd></div>
-              </dl>
-            </article>
+          <div className="pilot-stats-table-shell">
+            <table className="pilot-stats-table">
+              <thead>
+                <tr>
+                  <th rowSpan={2} className="pilot-stats-metric-head">Показатель</th>
+                  <th colSpan={4} className="group-pilot">Пилот</th>
+                  <th colSpan={3} className="group-type col-sep">Тип ВС · {pilot.aircraftType}</th>
+                  <th rowSpan={2} className="col-sep">Разница</th>
+                </tr>
+                <tr>
+                  <th className="group-pilot">Мин</th>
+                  <th className="group-pilot">Среднее</th>
+                  <th className="group-pilot">Макс</th>
+                  <th className="group-pilot">Медиана</th>
+                  <th className="group-type col-sep">Мин</th>
+                  <th className="group-type">Среднее</th>
+                  <th className="group-type">Макс</th>
+                </tr>
+              </thead>
+              <tbody>
+                {metricDefinitions.map((item) => {
+                  const own = pilot.metrics[item.key];
+                  const baseline = pilot.typeMetrics[item.key];
+                  const rowDelta = own !== null && baseline !== null ? own - baseline : null;
+                  const isSelected = item.key === selectedMetric;
+                  return (
+                    <tr
+                      key={item.key}
+                      className={isSelected ? "is-selected" : ""}
+                      onClick={() => setSelectedMetric(item.key)}
+                    >
+                      <th scope="row">{item.label}{item.unit && <small>, {item.unit}</small>}</th>
+                      <td>{formatMetric(pilot.minMetrics[item.key], item.key)}</td>
+                      <td className="is-mean">{formatMetric(own, item.key)}</td>
+                      <td>{formatMetric(pilot.maxMetrics[item.key], item.key)}</td>
+                      <td>{formatMetric(pilot.medianMetrics[item.key], item.key)}</td>
+                      <td className="col-sep">{formatMetric(pilot.typeMinMetrics[item.key], item.key)}</td>
+                      <td className="is-mean">{formatMetric(baseline, item.key)}</td>
+                      <td>{formatMetric(pilot.typeMaxMetrics[item.key], item.key)}</td>
+                      <td className="col-sep is-delta">
+                        {rowDelta === null ? "—" : `${rowDelta > 0 ? "+" : ""}${formatMetric(rowDelta, item.key)}`}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
-          <article className="chart-card pilot-card-radar">
+          <article className="chart-card pilot-card-profile">
             <div className="chart-head">
               <div><span>Все показатели</span><h2>Профиль пилота</h2></div>
               <ul className="chart-legend">
-                <li><i className="pilot-radar-legend-pilot" />{pilot.name}</li>
-                <li><i className="pilot-radar-legend-type" />Среднее по типу ВС</li>
+                <li><i className="profile-legend-type-range" />Диапазон типа ВС</li>
+                <li><i className="profile-legend-pilot-range" />Диапазон пилота</li>
+                <li><i className="profile-legend-pilot-avg" />Среднее пилота</li>
+                <li><i className="profile-legend-type-avg" />Среднее по типу ВС</li>
               </ul>
             </div>
-            <p className="note">Каждая ось — свой показатель: центр — минимум пилота, край — его максимум. Если среднее по типу ВС выходит за пределы этого диапазона, значение подписано за пределами круга.</p>
-            <PilotRadarChart axes={radarAxes} selectedMetric={selectedMetric} pilotLabel={pilot.name} baselineLabel="Среднее по типу ВС" />
+            <p className="note">Голубая дорожка — диапазон по типу ВС, одинаковый по длине во всех строках. Внутри неё видно, какую часть этого диапазона занимает пилот. Точные значения есть в таблице выше и при наведении на строку.</p>
+            <PilotRangeProfile axes={profileAxes} selectedMetric={selectedMetric} pilotLabel={pilot.name} baselineLabel="тип ВС" />
           </article>
         </div>}
 

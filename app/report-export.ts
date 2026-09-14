@@ -1,6 +1,6 @@
 import type { Content, TableCell, TDocumentDefinitions } from "pdfmake/interfaces";
-import { formatMetric, metricDefinitions, type FlightMetricKey, type MultiHistogramBin, type StatisticRow, type StatDimension, statDimensionLabels } from "./flight-data";
-import { comparisonRangeSvg, normalizedDistributionSvg, type ChartSeries } from "./histogram";
+import { formatMetric, metricDefinitions, type FlightMetricKey, type MultiHistogramBin, type PilotSummary, type StatisticRow, type StatDimension, statDimensionLabels } from "./flight-data";
+import { comparisonRangeSvg, normalizedDistributionSvg, pilotProfileSvg, pilotProfileLegendSvg, type ChartSeries, type PilotProfileAxis } from "./histogram";
 
 export type StatisticReport = {
   generatedAt: Date;
@@ -113,7 +113,7 @@ export async function downloadStatisticExcel(report: StatisticReport) {
 }
 
 const pdfHeaderCell = (text: string): TableCell => ({ text, bold: true, color: "#ffffff", fillColor: NAVY, margin: [3, 4, 3, 4] });
-const pdfBodyCell = (text: string | number, options: Partial<TableCell> = {}): TableCell => ({ text, margin: [3, 3, 3, 3], ...options });
+const pdfBodyCell = (text: string | number, options: Partial<TableCell> = {}): TableCell => ({ text, margin: [3, 2.5, 3, 2.5], ...options });
 
 export function buildStatisticPdfDocument(report: StatisticReport): TDocumentDefinitions {
   const metricSections: Content[] = report.reportMetrics.flatMap((key, metricIndex): Content[] => {
@@ -197,6 +197,139 @@ export async function downloadStatisticPdf(report: StatisticReport) {
   await new Promise<void>((resolve, reject) => {
     try {
       pdfMake.createPdf(buildStatisticPdfDocument(report)).download(`flight-analytics-report-${stamp(report.generatedAt)}.pdf`, resolve);
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+export type PilotReport = {
+  generatedAt: Date;
+  pilot: PilotSummary;
+  profileAxes: PilotProfileAxis[];
+  selectedMetric: FlightMetricKey;
+  flightsInScope: number;
+  aircraftFilter: string;
+  airportFilter: string;
+  avatarDataUrl: string;
+};
+
+const reportLabel = (text: string): Content => ({ text, fontSize: 7, bold: true, color: MUTED, characterSpacing: 0.6, margin: [0, 0, 0, 2] });
+const reportValue = (text: string, options: Partial<Content> = {}): Content => ({ text, fontSize: 10, bold: true, color: INK, margin: [0, 0, 0, 7], ...options } as Content);
+
+export function buildPilotReportPdfDocument(dossier: PilotReport): TDocumentDefinitions {
+  const { pilot } = dossier;
+  const profile = pilotProfileSvg(dossier.profileAxes, dossier.selectedMetric);
+
+  const headerCell = (text: string, options: Partial<TableCell> = {}): TableCell => ({ text, bold: true, fontSize: 7, color: "#687985", fillColor: "#f3f6f7", alignment: "center", margin: [2, 3, 2, 3], ...options });
+  const groupCell = (text: string, span: number, color: string, fill: string): TableCell => ({ text, colSpan: span, bold: true, fontSize: 7, color, fillColor: fill, alignment: "center", margin: [2, 3, 2, 3] });
+
+  const tableBody: TableCell[][] = [
+    [
+      headerCell("Показатель", { rowSpan: 2, alignment: "left" }),
+      groupCell("Пилот", 4, "#a8182b", "#fdf1f3"), {}, {}, {},
+      groupCell(`Тип ВС · ${pilot.aircraftType}`, 3, NAVY, "#edf2fa"), {}, {},
+      headerCell("Разница", { rowSpan: 2 }),
+    ],
+    [
+      {},
+      headerCell("Мин"), headerCell("Среднее"), headerCell("Макс"), headerCell("Медиана"),
+      headerCell("Мин"), headerCell("Среднее"), headerCell("Макс"),
+      {},
+    ],
+    ...metricDefinitions.map((item): TableCell[] => {
+      const own = pilot.metrics[item.key];
+      const baseline = pilot.typeMetrics[item.key];
+      const delta = own !== null && baseline !== null ? own - baseline : null;
+      const selected = item.key === dossier.selectedMetric;
+      const fill = selected ? "#fdeef0" : undefined;
+      const cell = (value: number | null, options: Partial<TableCell> = {}): TableCell =>
+        ({ text: formatMetric(value, item.key), alignment: "right", fillColor: fill, margin: [3, 2.5, 3, 2.5], ...options });
+      return [
+        { text: `${item.label}, ${item.unit}`, bold: true, color: selected ? RED : INK, fillColor: fill, margin: [3, 2.5, 3, 2.5] },
+        cell(pilot.minMetrics[item.key]),
+        cell(own, { bold: true }),
+        cell(pilot.maxMetrics[item.key]),
+        cell(pilot.medianMetrics[item.key]),
+        cell(pilot.typeMinMetrics[item.key]),
+        cell(baseline, { bold: true }),
+        cell(pilot.typeMaxMetrics[item.key]),
+        { text: deltaText(delta, item.key), alignment: "right", bold: true, fillColor: fill, margin: [3, 2.5, 3, 2.5] },
+      ];
+    }),
+  ];
+
+  return {
+    pageSize: "A4",
+    pageOrientation: "landscape",
+    pageMargins: [30, 30, 30, 34],
+    info: { title: `Карточка пилота — ${pilot.name}`, subject: `Табельный № ${pilot.code}`, creator: "Flight Analytics" },
+    defaultStyle: { font: "Roboto", fontSize: 8, color: INK },
+    footer: (currentPage, pageCount) => ({ text: `Flight Analytics · карточка пилота · ${currentPage} / ${pageCount}`, alignment: "right", color: MUTED, fontSize: 7, margin: [0, 8, 30, 0] }),
+    styles: {
+      title: { fontSize: 18, bold: true, color: NAVY },
+      eyebrow: { fontSize: 7, bold: true, color: RED, characterSpacing: 1.1 },
+      sectionTitle: { fontSize: 12, bold: true, color: NAVY, margin: [0, 10, 0, 5] },
+    },
+    content: [
+      { text: "АНАЛИТИКА ЛЁТНЫХ ДАННЫХ", style: "eyebrow" },
+      { text: "Карточка пилота", style: "title", margin: [0, 3, 0, 10] },
+      {
+        columns: [
+          {
+            width: "auto",
+            stack: [
+              { image: dossier.avatarDataUrl, width: 82, alignment: "center", margin: [0, 0, 0, 14] },
+              reportLabel("ТАБЕЛЬНЫЙ НОМЕР"),
+              reportValue(pilot.code),
+              reportLabel("ФАМИЛИЯ, ИМЯ, ОТЧЕСТВО"),
+              reportValue(pilot.name),
+              reportLabel("ДОЛЖНОСТЬ"),
+              reportValue(pilot.role === "КВС" ? "Командир воздушного судна" : "Второй пилот", { color: NAVY }),
+              reportLabel("ТИП ВС"),
+              reportValue(pilot.aircraftType),
+              reportLabel("РЕЙСОВ В ВЫБОРКЕ"),
+              reportValue(String(dossier.flightsInScope), { margin: [0, 0, 0, 0] }),
+            ],
+          },
+          {
+            width: "*",
+            stack: [
+              { text: "Профиль по всем показателям", style: "sectionTitle", margin: [0, 0, 0, 3] },
+              { svg: pilotProfileLegendSvg(), width: 516, margin: [0, 0, 0, 7] },
+              ...(profile ? [{ svg: profile, width: 516 } as Content] : [{ text: "Нет данных для профиля.", color: MUTED } as Content]),
+            ],
+          },
+        ],
+        columnGap: 22,
+      },
+      { text: "Показатели пилота и типа ВС", style: "sectionTitle" },
+      {
+        table: { headerRows: 2, dontBreakRows: true, widths: [152, "*", "*", "*", "*", "*", "*", "*", 50], body: tableBody },
+        layout: "lightHorizontalLines",
+      },
+      {
+        text: `Фильтры выборки: тип ВС — ${dossier.aircraftFilter || "все"}; аэропорт — ${dossier.airportFilter || "все"}. Сформировано ${dossier.generatedAt.toLocaleString("ru-RU")}.`,
+        color: MUTED,
+        fontSize: 7,
+        margin: [0, 10, 0, 0],
+      },
+    ],
+  };
+}
+
+export async function downloadPilotReportPdf(dossier: PilotReport) {
+  const [pdfMakeModule, pdfFontsModule] = await Promise.all([
+    import("pdfmake/build/pdfmake"),
+    import("pdfmake/build/vfs_fonts"),
+  ]);
+  const pdfMake = (pdfMakeModule as typeof pdfMakeModule & { default?: typeof pdfMakeModule }).default ?? pdfMakeModule;
+  const fonts = (pdfFontsModule as typeof pdfFontsModule & { default?: typeof pdfFontsModule }).default ?? pdfFontsModule;
+  pdfMake.addVirtualFileSystem(fonts);
+  const safeName = dossier.pilot.name.replace(/\s+/g, "-").toLocaleLowerCase("ru-RU");
+  await new Promise<void>((resolve, reject) => {
+    try {
+      pdfMake.createPdf(buildPilotReportPdfDocument(dossier)).download(`pilot-card-${dossier.pilot.code}-${safeName}-${stamp(dossier.generatedAt)}.pdf`, resolve);
     } catch (error) {
       reject(error);
     }

@@ -52,19 +52,43 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 
 .pilot-card-header h2 { margin: 0 0 8px; color: var(--ink); font-size: 24px; letter-spacing: -0.03em; }
 
+.pilot-card-identity { display: flex; min-width: 0; align-items: center; gap: 16px; }
+
+.pilot-card-identity-text { min-width: 0; }
+
+.pilot-card-avatar { display: grid; width: 64px; height: 64px; flex: 0 0 auto; place-items: end center; overflow: hidden; border: 1px solid #d3deea; border-radius: 50%; background: #e9eff7; }
+
+.pilot-card-avatar img { width: 52px; height: 52px; margin-bottom: -2px; object-fit: contain; object-position: bottom; opacity: 0.86; }
+
 .pilot-card-meta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 
 .pilot-card-role, .pilot-card-code, .pilot-card-aircraft { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; }
 
-.pilot-card-role { background: #e8f0f5; color: var(--navy); }
+.pilot-card-role { background: var(--navy); color: white; }
 
-.pilot-card-code { background: #fef3e8; color: #b5652d; }
+.pilot-card-role.is-second { background: #e3eaf3; color: var(--navy); }
 
-.pilot-card-aircraft { background: #e8f5f0; color: var(--green); }
+.pilot-card-code { background: #eef2f5; color: #55636f; }
 
-.pilot-card-close { position: absolute; top: 20px; right: 20px; display: grid; width: 36px; height: 36px; place-items: center; padding: 0; border: 0; border-radius: 10px; cursor: pointer; background: white; color: #7b8a94; font-size: 24px; font-weight: 300; line-height: 1; transition: all 0.15s ease; }
+.pilot-card-aircraft { background: #eef2f5; color: #55636f; }
+
+.pilot-card-count { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 8px; background: #eef2f5; color: #55636f; font-size: 11px; font-weight: 700; }
+
+.pilot-card-close { display: grid; width: 36px; height: 36px; place-items: center; padding: 0; border: 0; border-radius: 10px; cursor: pointer; background: white; color: #7b8a94; font-size: 24px; font-weight: 300; line-height: 1; transition: all 0.15s ease; }
 
 .pilot-card-close:hover { background: var(--red); color: white; }
+
+.pilot-card-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; }
+
+.pilot-card-report { display: inline-flex; height: 38px; align-items: center; gap: 9px; padding: 0 14px 0 6px; border: 1px solid #c7d1d8; border-radius: 10px; cursor: pointer; background: white; color: var(--ink); font-size: 11px; font-weight: 800; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+
+.pilot-card-report:hover:not(:disabled) { border-color: var(--red); box-shadow: 0 6px 16px rgba(213, 34, 56, 0.16); }
+
+.pilot-card-report:disabled { cursor: progress; opacity: 0.65; }
+
+.pilot-card-report-icon { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 7px; background: var(--red); color: white; font-size: 8px; font-weight: 900; letter-spacing: 0.02em; }
+
+.pilot-card-report-error { margin: 10px 28px 0; color: #a51428; font-size: 11px; font-weight: 700; }
 
 .pilot-card-tabs { display: flex; gap: 7px; padding: 16px 28px 0; }
 
@@ -91,33 +115,49 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 
 .pilot-card-metric-select:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(24, 57, 100, 0.1); }
 
-.pilot-card-stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.pilot-card-profile { margin-top: 16px; }
 
-.pilot-card-stat-card { display: grid; gap: 12px; padding: 18px 20px; border: 1px solid #d7dde1; border-radius: 14px; background: white; box-shadow: 0 8px 20px rgba(16, 39, 64, 0.06); transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.profile-legend-type-range { width: 18px; height: 9px; border-radius: 99px; background: #e8eef9; }
 
-.pilot-card-stat-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(16, 39, 64, 0.1); }
+.profile-legend-pilot-range { width: 18px; height: 7px; border-radius: 99px; background: #d5223852; }
 
-.pilot-card-stat-card.is-primary { border-color: #c8dce8; background: linear-gradient(135deg, #f8fbff 0%, #f0f6ff 100%); }
+.profile-legend-pilot-avg { width: 10px; height: 10px; border: 2px solid #fff; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 1px var(--red); }
 
-.pilot-card-stat-card span { color: #63717d; font-size: 9px; font-weight: 900; letter-spacing: 0.065em; text-transform: uppercase; }
+.profile-legend-type-avg { width: 3px; height: 14px; border-radius: 2px; background: var(--navy); }
 
-.pilot-card-stat-card strong { color: var(--ink); font-size: 18px; letter-spacing: -0.02em; }
+.pilot-stats-table-shell { overflow-x: auto; border: 1px solid #d7dde1; border-radius: 14px; background: white; box-shadow: 0 8px 20px rgba(16, 39, 64, 0.06); }
 
-.pilot-card-stat-card dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.pilot-stats-table { width: 100%; min-width: 660px; table-layout: fixed; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
 
-.pilot-card-stat-card dt { color: #74818a; font-size: 10px; font-weight: 600; }
+.pilot-stats-table thead th { padding: 6px 8px; background: #f3f6f7; color: #687985; font-size: 9px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; text-align: right; white-space: nowrap; }
 
-.pilot-card-stat-card dd { color: var(--ink); font-size: 13px; font-weight: 700; margin: 0; }
+.pilot-stats-table thead th.group-pilot { background: #fdf1f3; color: #a8182b; }
 
-.pilot-card-stat-card dd.positive { color: var(--green); }
+.pilot-stats-table thead th.group-type { background: #edf2fa; color: var(--navy); }
 
-.pilot-card-stat-card dd.negative { color: var(--red); }
+.pilot-stats-table thead th[colspan] { text-align: center; }
 
-.pilot-card-radar { margin-top: 16px; }
+.pilot-stats-table .pilot-stats-metric-head { position: static; width: 23%; text-align: left; background: #f3f6f7; }
 
-.pilot-radar-legend-pilot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); }
+.pilot-stats-table .col-sep { border-left: 1px solid #dfe6ea; }
 
-.pilot-radar-legend-type { width: 9px; height: 9px; border: 2px solid var(--navy); background: #fff; transform: rotate(45deg); }
+.pilot-stats-table tbody th { position: static; width: 23%; padding: 6px 8px; white-space: normal; border-bottom: 1px solid #eef1f3; background: white; color: var(--ink); font-size: 11px; font-weight: 700; text-align: left; white-space: nowrap; }
+
+.pilot-stats-table tbody th small { color: #98a4ad; font-weight: 600; }
+
+.pilot-stats-table tbody td { padding: 6px 8px; border-bottom: 1px solid #eef1f3; color: #4a5a67; text-align: right; white-space: nowrap; }
+
+.pilot-stats-table tbody td.is-mean { color: var(--ink); font-weight: 700; }
+
+.pilot-stats-table tbody td.is-delta { color: var(--ink); font-weight: 700; }
+
+.pilot-stats-table tbody tr { cursor: pointer; }
+
+.pilot-stats-table tbody tr:hover th, .pilot-stats-table tbody tr:hover td { background: #f9fbfb; }
+
+.pilot-stats-table tbody tr.is-selected th, .pilot-stats-table tbody tr.is-selected td { background: #fff4f5; }
+
+.pilot-stats-table tbody tr.is-selected th { color: var(--red); }
 
 /* Flight Filters */
 .pilot-card-filters { display: grid; grid-template-columns: repeat(3, minmax(180px, 1fr)) minmax(120px, auto); gap: 12px; align-items: end; padding: 20px 28px; border-bottom: 1px solid #e5e9ea; background: white; }

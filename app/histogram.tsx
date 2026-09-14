@@ -431,7 +431,7 @@ export function comparisonRangeSvg(rows: StatisticRow[], metric: FlightMetricKey
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Среднее, диапазон и ${escapeXml(baselineLabel.toLocaleLowerCase("ru-RU"))}"><rect width="${width}" height="${height}" fill="#fff"/>${grid}${marks}</svg>`;
 }
 
-export type PilotRadarAxis = {
+export type PilotProfileAxis = {
   key: FlightMetricKey;
   label: string;
   unit: string;
@@ -444,151 +444,212 @@ export type PilotRadarAxis = {
   typeMax: number | null;
 };
 
-const RADAR_R = 118;
-const RADAR_CENTER = { x: 250, y: 198 };
-const RADAR_SIZE = { width: 500, height: 470 };
-const RADAR_LABEL_R = RADAR_R * 1.24;
-const RADAR_RINGS = [0.25, 0.5, 0.75, 1];
+const PROFILE_WIDTH = 600;
+const PROFILE_LABEL_W = 150;
+const PROFILE_VALUE_W = 84;
+const PROFILE_ROW_H = 24;
+const PROFILE_SELECTED_ROW_H = 52;
+const PROFILE_PAD_TOP = 8;
+const PROFILE_PAD_BOTTOM = 5;
+const PROFILE_TRACK_H = 11;
+const PROFILE_BAND_H = 6;
+// Силуэты в системе координат 24x24: самолёт помечает среднее по типу ВС, фигура человека — среднее пилота.
+const PROFILE_ICON = 16;
+const PROFILE_ICON_GAP = 4;
+const PLANE_PATH = "M12 1.6C13 1.6 13.9 3 13.9 4.6L13.9 8.2L22.4 13.3L22.4 15.4L13.9 12.9L13.9 17.6L16.5 19.5L16.5 21.1L12 19.9L7.5 21.1L7.5 19.5L10.1 17.6L10.1 12.9L1.6 15.4L1.6 13.3L10.1 8.2L10.1 4.6C10.1 3 11 1.6 12 1.6Z";
+const PILOT_HEAD_PATH = "M12 3.2C14.6 3.2 16.8 5.4 16.8 8.1C16.8 10.8 14.6 13 12 13C9.4 13 7.2 10.8 7.2 8.1C7.2 5.4 9.4 3.2 12 3.2Z";
+const PILOT_BODY_PATH = "M12 14.6C17 14.6 21.2 17.9 21.2 22H2.8C2.8 17.9 7 14.6 12 14.6Z";
 
-const radarPolar = (angle: number, r: number) => ({
-  x: RADAR_CENTER.x + r * Math.cos(angle),
-  y: RADAR_CENTER.y + r * Math.sin(angle),
-});
-const radarLabelAnchor = (angle: number): "start" | "middle" | "end" => {
-  const cos = Math.cos(angle);
-  if (cos > 0.25) return "start";
-  if (cos < -0.25) return "end";
-  return "middle";
-};
-const radarLabelDy = (angle: number) => {
-  const sin = Math.sin(angle);
-  if (sin < -0.35) return -6;
-  if (sin > 0.35) return 15;
-  return 4;
+const PROFILE_TRACK_FILL = "#e8eef9";
+
+// Геометрия профиля считается один раз и используется и экранной версией, и SVG для PDF,
+// чтобы две отрисовки не разъезжались.
+type ProfileRowLayout = {
+  axis: PilotProfileAxis;
+  top: number;
+  rowHeight: number;
+  mid: number;
+  selected: boolean;
+  trackFrom: number;
+  trackWidth: number;
+  bandFrom: number | null;
+  bandWidth: number;
+  pilotX: number | null;
+  typeX: number | null;
 };
 
-export function PilotRadarChart({
+function layoutPilotProfile(axes: PilotProfileAxis[], selectedMetric: FlightMetricKey) {
+  const rows = axes.filter((axis) => axis.typeMin !== null && axis.typeMax !== null);
+  const plotX = PROFILE_LABEL_W;
+  const plotWidth = PROFILE_WIDTH - PROFILE_LABEL_W - PROFILE_VALUE_W;
+  const rowHeights = rows.map((axis) => (axis.key === selectedMetric ? PROFILE_SELECTED_ROW_H : PROFILE_ROW_H));
+  const rowTops = rowHeights.map((_, index) => PROFILE_PAD_TOP + rowHeights.slice(0, index).reduce((sum, item) => sum + item, 0));
+
+  const laidOut = rows.map((axis, index): ProfileRowLayout => {
+    const typeMin = axis.typeMin as number;
+    const typeMax = axis.typeMax as number;
+    const rawSpan = typeMax - typeMin;
+    const pad = rawSpan !== 0 ? rawSpan * 0.1 : (typeMax !== 0 ? Math.abs(typeMax) * 0.1 : 1);
+    const scaleMin = typeMin - pad;
+    const scaleSpan = rawSpan + pad * 2;
+    const xFor = (value: number) => plotX + plotWidth * Math.min(1, Math.max(0, (value - scaleMin) / scaleSpan));
+
+    const trackFrom = xFor(typeMin);
+    const hasPilotRange = axis.pilotMin !== null && axis.pilotMax !== null;
+    const bandFrom = hasPilotRange ? xFor(axis.pilotMin as number) : null;
+
+    return {
+      axis,
+      top: rowTops[index],
+      rowHeight: rowHeights[index],
+      mid: rowTops[index] + rowHeights[index] / 2,
+      selected: axis.key === selectedMetric,
+      trackFrom,
+      trackWidth: Math.max(PROFILE_TRACK_H, xFor(typeMax) - trackFrom),
+      bandFrom,
+      bandWidth: bandFrom === null ? 0 : Math.max(PROFILE_BAND_H, xFor(axis.pilotMax as number) - bandFrom),
+      pilotX: axis.pilotAvg === null ? null : xFor(axis.pilotAvg),
+      typeX: axis.typeAvg === null ? null : xFor(axis.typeAvg),
+    };
+  });
+
+  return {
+    rows: laidOut,
+    height: PROFILE_PAD_TOP + rowHeights.reduce((sum, item) => sum + item, 0) + PROFILE_PAD_BOTTOM,
+    valueX: PROFILE_WIDTH - 4,
+  };
+}
+
+const profileRowTitle = (axis: PilotProfileAxis, pilotLabel: string, baselineLabel: string) => {
+  const pilotPart = axis.pilotAvg !== null
+    ? `${pilotLabel}: ${formatMetric(axis.pilotMin, axis.key, true)} – ${formatMetric(axis.pilotMax, axis.key, true)}, среднее ${formatMetric(axis.pilotAvg, axis.key, true)}`
+    : `${pilotLabel}: нет данных`;
+  const typePart = `${baselineLabel}: ${formatMetric(axis.typeMin, axis.key, true)} – ${formatMetric(axis.typeMax, axis.key, true)}, среднее ${formatMetric(axis.typeAvg, axis.key, true)}`;
+  return `${axis.label}. ${pilotPart}. ${typePart}.`;
+};
+
+// Профиль пилота: по строке на показатель. Голубая дорожка — диапазон типа ВС (минимум→максимум),
+// одинаковой длины во всех строках, потому что каждая строка нормирована по своему диапазону типа.
+// Внутри неё красный пояс — диапазон пилота, точка — его среднее, синяя метка — среднее по типу.
+export function PilotRangeProfile({
   axes,
   selectedMetric,
   pilotLabel,
   baselineLabel,
 }: {
-  axes: PilotRadarAxis[];
+  axes: PilotProfileAxis[];
   selectedMetric: FlightMetricKey;
   pilotLabel: string;
   baselineLabel: string;
 }) {
-  const n = axes.length;
-  if (n < 3) return <p className="note">Недостаточно показателей для диаграммы.</p>;
-  const angleStep = (Math.PI * 2) / n;
-  const angleAt = (index: number) => -Math.PI / 2 + index * angleStep;
-
-  const pilotPoints: Array<{ x: number; y: number; axis: PilotRadarAxis }> = [];
-  const typePoints: Array<{ x: number; y: number; axis: PilotRadarAxis }> = [];
-
-  axes.forEach((axis, index) => {
-    if (axis.typeMin === null || axis.typeMax === null) return;
-    const angle = angleAt(index);
-    // Шкала оси всегда опирается на диапазон типа ВС (не пилота), с запасом 10% с каждой
-    // стороны, чтобы деления и точки не упирались в центр/обод. Пилот — подмножество типа,
-    // поэтому его точки физически всегда попадают внутрь этого диапазона.
-    const rawSpan = axis.typeMax - axis.typeMin;
-    const pad = rawSpan !== 0 ? rawSpan * 0.1 : (axis.typeMax !== 0 ? Math.abs(axis.typeMax) * 0.1 : 1);
-    const scaleMin = axis.typeMin - pad;
-    const scaleSpan = rawSpan + pad * 2;
-    const radiusFor = (value: number) => Math.min(RADAR_R, Math.max(0, RADAR_R * ((value - scaleMin) / scaleSpan)));
-
-    if (axis.pilotAvg !== null) {
-      const pilotPoint = radarPolar(angle, radiusFor(axis.pilotAvg));
-      pilotPoints.push({ x: pilotPoint.x, y: pilotPoint.y, axis });
-    }
-
-    if (axis.typeAvg !== null) {
-      const typePoint = radarPolar(angle, radiusFor(axis.typeAvg));
-      typePoints.push({ x: typePoint.x, y: typePoint.y, axis });
-    }
-  });
-
-  const pilotPath = pilotPoints.length > 2 ? `M ${pilotPoints.map((p) => `${p.x} ${p.y}`).join(" L ")} Z` : "";
-  const typePath = typePoints.length > 2 ? `M ${typePoints.map((p) => `${p.x} ${p.y}`).join(" L ")} Z` : "";
+  const { rows, height, valueX } = layoutPilotProfile(axes, selectedMetric);
+  if (!rows.length) return <p className="note">Недостаточно данных для профиля пилота.</p>;
 
   return (
     <div className="chart-scroll">
-      <div className="chart-plot" style={{ minWidth: Math.max(RADAR_SIZE.width, 420) }}>
+      <div className="chart-plot" style={{ minWidth: 540 }}>
         <svg
-          viewBox={`0 0 ${RADAR_SIZE.width} ${RADAR_SIZE.height}`}
+          viewBox={`0 0 ${PROFILE_WIDTH} ${height}`}
           role="img"
-          aria-label={`Личная статистика ${pilotLabel} по всем показателям в сравнении со средним по типу ВС`}
+          aria-label={`Профиль ${pilotLabel}: диапазон и среднее по каждому показателю в сравнении с диапазоном по ${baselineLabel}`}
           preserveAspectRatio="xMidYMid meet"
         >
-          {RADAR_RINGS.map((ring) => (
-            <circle key={ring} cx={RADAR_CENTER.x} cy={RADAR_CENTER.y} r={RADAR_R * ring} fill="none" stroke={GRID} strokeWidth={ring === 1 ? 1.4 : 1} />
-          ))}
-          {axes.map((axis, index) => {
-            const angle = angleAt(index);
-            const tip = radarPolar(angle, RADAR_R);
-            const selected = axis.key === selectedMetric;
-            return (
-              <line
-                key={axis.key}
-                x1={RADAR_CENTER.x}
-                y1={RADAR_CENTER.y}
-                x2={tip.x}
-                y2={tip.y}
-                stroke={selected ? NAVY : GRID}
-                strokeWidth={selected ? 1.6 : 1}
-                opacity={selected ? 0.55 : 1}
-              />
-            );
-          })}
+          {rows.map(({ axis, top, rowHeight, mid, selected, trackFrom, trackWidth, bandFrom, bandWidth, pilotX, typeX }) => (
+            <g key={axis.key}>
+              <title>{profileRowTitle(axis, pilotLabel, baselineLabel)}</title>
+              <rect x="0" y={top + 1} width={PROFILE_WIDTH} height={rowHeight - 2} rx="8" fill={selected ? `${RED}0f` : "transparent"} />
 
-          {typePath && <path d={typePath} fill="none" stroke={NAVY} strokeWidth="2" strokeDasharray="5 4" strokeLinejoin="round" />}
-          {pilotPath && <path d={pilotPath} fill={RED} fillOpacity="0.16" stroke={RED} strokeWidth="2" strokeLinejoin="round" />}
+              <text
+                x={PROFILE_LABEL_W - 12}
+                y={mid}
+                dy="3"
+                textAnchor="end"
+                fill={selected ? RED : INK}
+                fontSize={selected ? 10 : 9}
+                fontWeight={selected ? 800 : 600}
+              >
+                {axis.label}
+              </text>
 
-          {typePoints.map(({ x, y, axis }) => (
-            <g key={`type-${axis.key}`}>
-              <path d={`M ${x} ${y - 5} L ${x + 5} ${y} L ${x} ${y + 5} L ${x - 5} ${y} Z`} fill="white" stroke={NAVY} strokeWidth="2" />
-              <title>{`${axis.label}: среднее по типу ВС ${formatMetric(axis.typeAvg, axis.key, true)}`}</title>
+              <rect x={trackFrom} y={mid - PROFILE_TRACK_H / 2} width={trackWidth} height={PROFILE_TRACK_H} rx={PROFILE_TRACK_H / 2} fill={PROFILE_TRACK_FILL} />
+
+              {bandFrom !== null && (
+                <rect x={bandFrom} y={mid - PROFILE_BAND_H / 2} width={bandWidth} height={PROFILE_BAND_H} rx={PROFILE_BAND_H / 2} fill={RED} fillOpacity="0.32" />
+              )}
+
+              {typeX !== null && (
+                <g>
+                  {selected && (
+                    <g transform={`translate(${typeX - PROFILE_ICON / 2}, ${mid - PROFILE_TRACK_H / 2 - PROFILE_ICON_GAP - PROFILE_ICON}) scale(${PROFILE_ICON / 24})`} fill={NAVY}>
+                      <path d={PLANE_PATH} />
+                    </g>
+                  )}
+                  <rect x={typeX - 3} y={mid - 9} width="6" height="18" rx="3" fill="white" />
+                  <rect x={typeX - 1} y={mid - 7.5} width="2" height="15" rx="1" fill={NAVY} />
+                </g>
+              )}
+
+              {pilotX !== null && (
+                <>
+                  <circle cx={pilotX} cy={mid} r="4" fill={RED} stroke="white" strokeWidth="2" />
+                  {selected && (
+                    <g transform={`translate(${pilotX - PROFILE_ICON / 2}, ${mid + PROFILE_TRACK_H / 2 + PROFILE_ICON_GAP}) scale(${PROFILE_ICON / 24})`} fill={RED}>
+                      <path d={PILOT_HEAD_PATH} />
+                      <path d={PILOT_BODY_PATH} />
+                    </g>
+                  )}
+                </>
+              )}
+
+              <text x={valueX} y={mid} dy="3" textAnchor="end" fill={INK} fontSize="9" fontWeight="700">
+                {axis.pilotAvg !== null ? formatMetric(axis.pilotAvg, axis.key, true) : "—"}
+              </text>
             </g>
           ))}
-
-          {pilotPoints.map(({ x, y, axis }) => (
-            <g key={`pilot-${axis.key}`}>
-              <circle cx={x} cy={y} r="4.5" fill={RED} stroke="white" strokeWidth="1.6" />
-              <title>{`${axis.label}: ${pilotLabel} — мин. ${formatMetric(axis.pilotMin, axis.key, true)}, среднее ${formatMetric(axis.pilotAvg, axis.key, true)}, макс. ${formatMetric(axis.pilotMax, axis.key, true)}`}</title>
-            </g>
-          ))}
-
-          {axes.map((axis, index) => {
-            const angle = angleAt(index);
-            const pos = radarPolar(angle, RADAR_LABEL_R);
-            const selected = axis.key === selectedMetric;
-            const anchor = radarLabelAnchor(angle);
-            const baseDy = radarLabelDy(angle);
-            const hasPilotValue = axis.pilotAvg !== null;
-            const typeEntry = typePoints.find((p) => p.axis.key === axis.key);
-            return (
-              <g key={`label-${axis.key}`}>
-                <text x={pos.x} y={pos.y} textAnchor={anchor} dy={baseDy} fill={selected ? RED : INK} fontSize={selected ? 11 : 10} fontWeight={selected ? 800 : 700}>
-                  {axis.label}
-                </text>
-                {hasPilotValue && (
-                  <text x={pos.x} y={pos.y} textAnchor={anchor} dy={baseDy + 15} fill={RED} fontSize="9" fontWeight="700">
-                    {`● ${formatMetric(axis.pilotAvg, axis.key, true)}`}
-                  </text>
-                )}
-                {typeEntry && (
-                  <text x={pos.x} y={pos.y} textAnchor={anchor} dy={baseDy + 29} fill={NAVY} fontSize="9" fontWeight="700">
-                    {`◇ ${formatMetric(axis.typeAvg, axis.key, true)}`}
-                  </text>
-                )}
-              </g>
-            );
-          })}
         </svg>
       </div>
     </div>
   );
+}
+
+// Легенда профиля теми же фигурами, что и на графике, — для PDF.
+export function pilotProfileLegendSvg() {
+  const width = PROFILE_WIDTH;
+  const height = 16;
+  const mid = height / 2;
+  const step = width / 4;
+  const items: Array<{ label: string; mark: (x: number) => string }> = [
+    { label: "Диапазон типа ВС", mark: (x) => `<rect x="${x}" y="${mid - 5}" width="18" height="10" rx="5" fill="${PROFILE_TRACK_FILL}"/>` },
+    { label: "Диапазон пилота", mark: (x) => `<rect x="${x}" y="${mid - 4}" width="18" height="8" rx="4" fill="${RED}" fill-opacity="0.32"/>` },
+    { label: "Среднее пилота", mark: (x) => `<circle cx="${x + 7}" cy="${mid}" r="4" fill="${RED}" stroke="#ffffff" stroke-width="2"/>` },
+    { label: "Среднее по типу ВС", mark: (x) => `<rect x="${x + 5}" y="${mid - 6}" width="2" height="12" rx="1" fill="${NAVY}"/>` },
+  ];
+  const content = items.map((item, index) => {
+    const x = index * step;
+    return `${item.mark(x)}<text x="${x + 24}" y="${mid + 3}" fill="${MUTED}" font-size="8.5" font-weight="700">${escapeXml(item.label)}</text>`;
+  }).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Легенда профиля"><rect width="${width}" height="${height}" fill="#ffffff"/>${content}</svg>`;
+}
+
+// Тот же профиль строкой SVG — для вставки в PDF-досье.
+export function pilotProfileSvg(axes: PilotProfileAxis[], selectedMetric: FlightMetricKey) {
+  const { rows, height, valueX } = layoutPilotProfile(axes, selectedMetric);
+  if (!rows.length) return "";
+
+  const marks = rows.map(({ axis, top, rowHeight, mid, selected, trackFrom, trackWidth, bandFrom, bandWidth, pilotX, typeX }) => {
+    const highlight = selected ? `<rect x="0" y="${top + 1}" width="${PROFILE_WIDTH}" height="${rowHeight - 2}" rx="8" fill="#fdeef0"/>` : "";
+    const label = `<text x="${PROFILE_LABEL_W - 12}" y="${mid + 3}" text-anchor="end" fill="${selected ? RED : INK}" font-size="${selected ? 10 : 9}" font-weight="${selected ? 800 : 600}">${escapeXml(axis.label)}</text>`;
+    const track = `<rect x="${trackFrom}" y="${mid - PROFILE_TRACK_H / 2}" width="${trackWidth}" height="${PROFILE_TRACK_H}" rx="${PROFILE_TRACK_H / 2}" fill="${PROFILE_TRACK_FILL}"/>`;
+    const band = bandFrom === null ? "" : `<rect x="${bandFrom}" y="${mid - PROFILE_BAND_H / 2}" width="${bandWidth}" height="${PROFILE_BAND_H}" rx="${PROFILE_BAND_H / 2}" fill="${RED}" fill-opacity="0.32"/>`;
+    const plane = typeX !== null && selected ? `<g transform="translate(${typeX - PROFILE_ICON / 2}, ${mid - PROFILE_TRACK_H / 2 - PROFILE_ICON_GAP - PROFILE_ICON}) scale(${PROFILE_ICON / 24})" fill="${NAVY}"><path d="${PLANE_PATH}"/></g>` : "";
+    const typeMark = typeX === null ? "" : `<rect x="${typeX - 3}" y="${mid - 9}" width="6" height="18" rx="3" fill="#ffffff"/><rect x="${typeX - 1}" y="${mid - 7.5}" width="2" height="15" rx="1" fill="${NAVY}"/>`;
+    const pilotMark = pilotX === null ? "" : `<circle cx="${pilotX}" cy="${mid}" r="4" fill="${RED}" stroke="#ffffff" stroke-width="2"/>`;
+    const person = pilotX !== null && selected ? `<g transform="translate(${pilotX - PROFILE_ICON / 2}, ${mid + PROFILE_TRACK_H / 2 + PROFILE_ICON_GAP}) scale(${PROFILE_ICON / 24})" fill="${RED}"><path d="${PILOT_HEAD_PATH}"/><path d="${PILOT_BODY_PATH}"/></g>` : "";
+    const value = `<text x="${valueX}" y="${mid + 3}" text-anchor="end" fill="${INK}" font-size="9" font-weight="700">${escapeXml(axis.pilotAvg !== null ? formatMetric(axis.pilotAvg, axis.key, true) : "—")}</text>`;
+    return `${highlight}${label}${track}${band}${plane}${typeMark}${pilotMark}${person}${value}`;
+  }).join("");
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PROFILE_WIDTH} ${height}" width="${PROFILE_WIDTH}" height="${height}" role="img" aria-label="Профиль пилота по всем показателям"><rect width="${PROFILE_WIDTH}" height="${height}" fill="#ffffff"/>${marks}</svg>`;
 }
 
 export function normalizedDistributionSvg(bins: MultiHistogramBin[], metric: FlightMetricKey, series: ChartSeries[], width = 860, height = 250) {
