@@ -34,8 +34,9 @@ export type ImportResult = {
   flights: Flight[]; 
   sourceRows: number; 
   duplicatesRemoved: number; 
-  duplicateGroups: number; 
-  conflictingDuplicateGroups: number; 
+  duplicateGroups: number;
+  conflictingDuplicateGroups: number;
+  routeConflictGroups: number;
   events: Event[];
   eventsMergeStats?: {
     mergedCount: number;
@@ -111,6 +112,16 @@ export const shortenPilotName = (fio: string): string => {
 const text = (value: unknown): string => { if (value == null) return ""; if (value instanceof Date) return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }).format(value); if (typeof value === "object") { const item = value as { text?: unknown; result?: unknown; richText?: Array<{ text?: unknown }> }; if (item.text !== undefined) return text(item.text); if (item.result !== undefined) return text(item.result); if (item.richText) return item.richText.map((part) => text(part.text)).join("").trim(); } return String(value).trim(); };
 const number = (value: unknown) => { if (typeof value === "number") return Number.isFinite(value) ? value : null; const source = text(value); const parsed = Number(source.replace(/\s/g, "").replace(",", ".")); return source && Number.isFinite(parsed) ? parsed : null; };
 const presentNumbers = (values: Array<number | null>) => values.filter((item): item is number => item !== null && Number.isFinite(item));
+// Самое частое значение среди дублирующихся строк одного рейса (например, аэропорт или тип ВС),
+// с устойчивым порядком при равенстве счётчиков — побеждает то, что встретилось раньше.
+const mostCommonValue = <T,>(values: T[]): T => {
+  const counts = new Map<T, number>();
+  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+  let best = values[0];
+  let bestCount = 0;
+  for (const [value, count] of counts) if (count > bestCount) { best = value; bestCount = count; }
+  return best;
+};
 const average = (values: Array<number | null>) => { const present = presentNumbers(values); return present.length ? present.reduce((sum, item) => sum + item, 0) / present.length : null; };
 const minimum = (values: Array<number | null>) => { const present = presentNumbers(values); return present.length ? Math.min(...present) : null; };
 const maximum = (values: Array<number | null>) => { const present = presentNumbers(values); return present.length ? Math.max(...present) : null; };
@@ -121,7 +132,16 @@ const median = (values: Array<number | null>) => {
   return present.length % 2 ? present[middle] : (present[middle - 1] + present[middle]) / 2;
 };
 const uniqueAverage = (values: Array<number | null>) => average([...new Set(values.filter((item): item is number => item !== null))]);
-const airport = (value: unknown) => { const clean = text(value).replace(/\s+/g, " ").toLocaleLowerCase("ru-RU"); return clean ? clean.charAt(0).toLocaleUpperCase("ru-RU") + clean.slice(1) : "Не указан"; };
+// Заглавная буква нужна не только в начале строки, но и после дефиса/пробела/скобки —
+// иначе "Санкт-Петербург" после общего понижения регистра превращался в "Санкт-петербург".
+// Соединительные частицы в топонимах ("Ростов-на-Дону", "Комсомольск-на-Амуре") по-русски
+// пишутся со строчной буквы — не капитализируем их отдельно.
+const AIRPORT_LOWERCASE_WORDS = new Set(["на", "по", "им"]);
+const airport = (value: unknown) => {
+  const clean = text(value).replace(/\s+/g, " ").toLocaleLowerCase("ru-RU");
+  if (!clean) return "Не указан";
+  return clean.replace(/[^\s(-]+/g, (word) => (AIRPORT_LOWERCASE_WORDS.has(word) ? word : word.charAt(0).toLocaleUpperCase("ru-RU") + word.slice(1)));
+};
 const aircraftType = (value: unknown) => {
   const source = text(value);
   const normalized = source.toLocaleLowerCase("ru-RU").replace(/[\s_-]+/g, "");
@@ -340,9 +360,36 @@ export function mergeEventsWithFlights(flights: Flight[], events: Event[]): {
 export function parseFlightRows(rows: SheetRow[], headers: string[]): ImportResult {
   const missing = required.filter((header) => !headers.includes(header)); if (missing.length) throw new Error(`В файле не найдены обязательные столбцы: ${missing.join(", ")}`);
   const groups = new Map<string, SheetRow[]>(); rows.forEach((row, index) => { if (!Object.values(row).some((value) => text(value))) return; const key = flightKey(row, index + 2); groups.set(key, [...(groups.get(key) ?? []), row]); });
-  let duplicateGroups = 0; let conflicts = 0;
-  const flights = [...groups.entries()].map(([key, group]): Flight => { if (group.length > 1) duplicateGroups += 1; const rowMetrics = group.map(metrics); if (group.length > 1 && metricDefinitions.some(({ key: metric }) => new Set(rowMetrics.map((item) => item[metric]).filter((item) => item !== null)).size > 1)) conflicts += 1; const representative = group.reduce((best, row) => Object.values(metrics(row)).filter((item) => item !== null).length > Object.values(metrics(best)).filter((item) => item !== null).length ? row : best); return { key, aircraftType: aircraftType(representative.Tip_VS), departure: airport(representative.Nazvanie_Aeroporta_Vzleta), arrival: airport(representative.Nazvanie_Aeroporta_Posadki), crew: crew(group), metrics: Object.fromEntries(metricDefinitions.map(({ key: metric }) => [metric, uniqueAverage(rowMetrics.map((item) => item[metric]))])) as Metrics, flightNumber: text(representative.Reys), date: text(representative.Data_Poleta), departureTime: text(representative.Vremya_Vzleta), arrivalTime: text(representative.Vremya_Posadki), board: text(representative.Bort), events: [] }; });
-  return { flights, sourceRows: rows.length, duplicatesRemoved: rows.length - flights.length, duplicateGroups, conflictingDuplicateGroups: conflicts, events: [] };
+  let duplicateGroups = 0; let conflicts = 0; let routeConflicts = 0;
+  const flights = [...groups.entries()].map(([key, group]): Flight => {
+    if (group.length > 1) duplicateGroups += 1;
+    const rowMetrics = group.map(metrics);
+    if (group.length > 1 && metricDefinitions.some(({ key: metric }) => new Set(rowMetrics.map((item) => item[metric]).filter((item) => item !== null)).size > 1)) conflicts += 1;
+    const representative = group.reduce((best, row) => Object.values(metrics(row)).filter((item) => item !== null).length > Object.values(metrics(best)).filter((item) => item !== null).length ? row : best);
+    // Аэропорты и тип ВС не входят в ключ группировки, поэтому у "сдвоенных" строк одного рейса
+    // они могут разойтись (опечатка, запасной аэродром и т.п.). Берём самое частое значение по
+    // группе, а не значение из representative — она выбрана по полноте метрик и может случайно
+    // указывать на неверный маршрут.
+    const departureValues = group.map((row) => airport(row.Nazvanie_Aeroporta_Vzleta));
+    const arrivalValues = group.map((row) => airport(row.Nazvanie_Aeroporta_Posadki));
+    const aircraftTypeValues = group.map((row) => aircraftType(row.Tip_VS));
+    if (group.length > 1 && (new Set(departureValues).size > 1 || new Set(arrivalValues).size > 1 || new Set(aircraftTypeValues).size > 1)) routeConflicts += 1;
+    return {
+      key,
+      aircraftType: mostCommonValue(aircraftTypeValues),
+      departure: mostCommonValue(departureValues),
+      arrival: mostCommonValue(arrivalValues),
+      crew: crew(group),
+      metrics: Object.fromEntries(metricDefinitions.map(({ key: metric }) => [metric, uniqueAverage(rowMetrics.map((item) => item[metric]))])) as Metrics,
+      flightNumber: text(representative.Reys),
+      date: text(representative.Data_Poleta),
+      departureTime: text(representative.Vremya_Vzleta),
+      arrivalTime: text(representative.Vremya_Posadki),
+      board: text(representative.Bort),
+      events: [],
+    };
+  });
+  return { flights, sourceRows: rows.length, duplicatesRemoved: rows.length - flights.length, duplicateGroups, conflictingDuplicateGroups: conflicts, routeConflictGroups: routeConflicts, events: [] };
 }
 const metricSet = (items: Flight[]) => {
   const values = (key: FlightMetricKey) => items.map((item) => item.metrics[key]);
