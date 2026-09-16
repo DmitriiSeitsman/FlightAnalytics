@@ -24,11 +24,13 @@ export function StatisticsView({
   sourceFile,
   aircraftFilter,
   airportFilter,
+  positions,
 }: {
   flights: Flight[];
   sourceFile: string;
   aircraftFilter: string;
   airportFilter: string;
+  positions: Map<string, "КВС" | "2П">;
 }) {
   const [dimension, setDimension] = useState<StatDimension>("pilots");
   const [statisticsAircraftType, setStatisticsAircraftType] = useState("");
@@ -42,7 +44,7 @@ export function StatisticsView({
   const aircraftTypes = useMemo(() => [...new Set(flights.map((flight) => flight.aircraftType))].sort((left, right) => left.localeCompare(right, "ru")), [flights]);
   const activeAircraftType = aircraftTypes.includes(statisticsAircraftType) ? statisticsAircraftType : "";
   const statisticsFlights = useMemo(() => flights.filter((flight) => !activeAircraftType || flight.aircraftType === activeAircraftType), [activeAircraftType, flights]);
-  const rows = useMemo(() => buildStatisticRows(statisticsFlights, dimension, dimension === "pilots" ? minFlights : 1), [dimension, minFlights, statisticsFlights]);
+  const rows = useMemo(() => buildStatisticRows(statisticsFlights, dimension, dimension === "pilots" ? minFlights : 1, positions), [dimension, minFlights, statisticsFlights, positions]);
   const activePrimaryId = rows.some((row) => row.id === primaryId) ? primaryId : rows[0]?.id ?? "";
   const activeComparisonIds = comparisonIds.filter((id) => id !== activePrimaryId && rows.some((row) => row.id === id)).slice(0, MAX_SERIES - 1);
   const selectedIds = useMemo(() => activePrimaryId ? [activePrimaryId, ...activeComparisonIds] : [], [activeComparisonIds, activePrimaryId]);

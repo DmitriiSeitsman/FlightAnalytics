@@ -111,8 +111,8 @@ export function FlightsView({ flights }: FlightsViewProps) {
               {paginatedFlights.map((flight, index) => {
                 const eventColor = worstEventColor(flight.events);
                 const stripeStyle = eventColor ? { boxShadow: `inset 4px 0 0 ${COLOR_STYLES[eventColor].text}` } : undefined;
-                const captain = flight.crew.find((member) => member.role === "КВС");
-                const copilot = flight.crew.find((member) => member.role === "2П");
+                const captain = flight.crew.find((member) => member.role === "CM1");
+                const copilot = flight.crew.find((member) => member.role === "CM2");
                 return (
                   <tr key={`${flight.key}-${index}`} className="flights-view-row" onClick={() => setSelectedFlight(flight)}>
                     <td style={stripeStyle}>{formatFlightDate(flight.date)}</td>

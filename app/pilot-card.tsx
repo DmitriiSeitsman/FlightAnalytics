@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatFlightDate, formatMetric, metricDefinitions, normalizeFlightDate, worstEventColor, summarizeEventColors, type Flight, type FlightMetricKey, type PilotSummary } from "./flight-data";
+import { formatFlightDate, formatMetric, metricDefinitions, normalizeFlightDate, worstEventColor, summarizeEventColors, type Flight, type FlightMetricKey, type PilotRow } from "./flight-data";
 import { PilotRangeProfile, type PilotProfileAxis } from "./histogram";
 import { COLOR_LABELS, COLOR_STYLES } from "./events-analytics";
 import { FlightDetailCard } from "./flight-detail-card";
 import { downloadPilotReportPdf } from "./report-export";
 
 interface PilotCardProps {
-  pilot: PilotSummary;
+  pilotRow: PilotRow;
   flights: Flight[];
   onClose: () => void;
   aircraftFilter?: string;
@@ -20,7 +20,12 @@ type SortDirection = "asc" | "desc";
 
 type PilotCardTab = "stats" | "flights";
 
-export function PilotCard({ pilot, flights, onClose, aircraftFilter = "", airportFilter = "" }: PilotCardProps) {
+export function PilotCard({ pilotRow, flights, onClose, aircraftFilter = "", airportFilter = "" }: PilotCardProps) {
+  // Компонент монтируется заново при смене pilotRow (см. key в page.tsx), поэтому activeSeat
+  // корректно сбрасывается на дефолт без эффекта.
+  const availableSeats = (["CM1", "CM2"] as const).filter((seat) => pilotRow.summaries[seat]);
+  const [activeSeat, setActiveSeat] = useState<"CM1" | "CM2">(() => (pilotRow.summaries.CM1 ? "CM1" : "CM2"));
+  const pilot = pilotRow.summaries[activeSeat] ?? pilotRow.summaries[availableSeats[0]]!;
   const [reportPending, setReportPending] = useState(false);
   const [reportError, setReportError] = useState("");
   const [tab, setTab] = useState<PilotCardTab>("stats");
@@ -135,7 +140,7 @@ export function PilotCard({ pilot, flights, onClose, aircraftFilter = "", airpor
     typeMax: pilot.typeMaxMetrics[item.key],
   })), [pilot]);
 
-  const avatarSrc = pilot.role === "КВС" ? "/pilot.png" : "/co-pilot.png";
+  const avatarSrc = pilot.role === "CM1" ? "/pilot.png" : "/co-pilot.png";
 
   const handleReport = async () => {
     setReportPending(true);
@@ -182,7 +187,8 @@ export function PilotCard({ pilot, flights, onClose, aircraftFilter = "", airpor
             <div className="pilot-card-identity-text">
               <h2 id="pilot-card-title">{pilot.name}</h2>
               <div className="pilot-card-meta">
-                <span className={`pilot-card-role${pilot.role === "КВС" ? "" : " is-second"}`}>{pilot.role}</span>
+                <span className={`pilot-card-role${pilot.role === "CM1" ? "" : " is-second"}`}>{pilot.role}</span>
+                <span className="pilot-card-position">{pilot.position}</span>
                 <span className="pilot-card-code">Табельный № {pilot.code}</span>
                 <span className="pilot-card-aircraft">{pilot.aircraftType}</span>
                 <span className="pilot-card-count">{pilotFlights.length} рейсов в выборке</span>
@@ -199,6 +205,17 @@ export function PilotCard({ pilot, flights, onClose, aircraftFilter = "", airpor
         </div>
 
         {reportError && <p className="pilot-card-report-error" role="alert">{reportError}</p>}
+
+        {availableSeats.length > 1 && (
+          <div className="pilot-card-seat-tabs">
+            <span className="pilot-card-seat-tabs-label">Кресло:</span>
+            {availableSeats.map((seat) => (
+              <button key={seat} type="button" className={activeSeat === seat ? "active" : ""} onClick={() => setActiveSeat(seat)}>
+                {seat} · {pilotRow.summaries[seat]!.flights} рейс.
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="pilot-card-tabs">
           <button type="button" className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}>Статистика</button>

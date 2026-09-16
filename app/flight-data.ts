@@ -11,7 +11,7 @@ export const metricDefinitions = [
 export type FlightMetricKey = typeof metricDefinitions[number]["key"];
 export type Metrics = Record<FlightMetricKey, number | null>;
 export type SheetRow = Record<string, unknown>;
-type CrewMember = { code: string; name: string; role: "КВС" | "2П" };
+type CrewMember = { code: string; name: string; role: "CM1" | "CM2" };
 export type Flight = { key: string; aircraftType: string; departure: string; arrival: string; crew: CrewMember[]; metrics: Metrics; flightNumber: string; date: string; departureTime: string; arrivalTime: string; board: string; events: Event[] };
 
 export type EventColor = "clRed" | "clOrange" | "clBlack" | "clGreen" | "clOlive" | "clFuchsia" | "unknown";
@@ -22,7 +22,7 @@ export type Event = {
   color: EventColor;
   pilotCode: string | null;
   pilotName: string | null;
-  pilotRole: "КВС" | "2П" | null;
+  pilotRole: "CM1" | "CM2" | null;
   date: string;
   flightNumber: string;
   flightId: string;
@@ -194,7 +194,7 @@ function groupFlightRows(rows: SheetRow[]) {
     cluster.rows,
   ]);
 }
-const crew = (rows: SheetRow[]) => { const members = new Map<string, CrewMember>(); for (const row of rows) for (const [role, nameKey, codeKey] of [["КВС", "FIO_KVS", "Kod_KVS"], ["2П", "FIO_2P", "Kod_2P"]] as const) { const name = text(row[nameKey]); const code = text(row[codeKey]); if (name && code) members.set(`${role}:${code}`, { role, name, code }); } return [...members.values()]; };
+const crew = (rows: SheetRow[]) => { const members = new Map<string, CrewMember>(); for (const row of rows) for (const [role, nameKey, codeKey] of [["CM1", "FIO_KVS", "Kod_KVS"], ["CM2", "FIO_2P", "Kod_2P"]] as const) { const name = text(row[nameKey]); const code = text(row[codeKey]); if (name && code) members.set(`${role}:${code}`, { role, name, code }); } return [...members.values()]; };
 
 export function parseEventRows(rows: SheetRow[], headers: string[]): Event[] {
   const missing = eventsRequired.filter((header) => !headers.includes(header));
@@ -238,7 +238,7 @@ export function parseEventRows(rows: SheetRow[], headers: string[]): Event[] {
     // с табельными номерами КВС/2П ни в одной строке реальных выгрузок.
     const pilotCode: string | null = kodKVS || null;
     const pilotName: string | null = fioKVS || null;
-    const pilotRole: "КВС" | "2П" | null = kodKVS ? "КВС" : null;
+    const pilotRole: "CM1" | "CM2" | null = kodKVS ? "CM1" : null;
     
     // Собираем все параметры из всех строк группы
     const parameters: EventParameter[] = [];
@@ -482,14 +482,16 @@ export type StatisticRow = {
   medianMetrics: Metrics;
   maxMetrics: Metrics;
   baselineMetrics: Metrics;
+  position?: "КВС" | "2П";
 };
 
-export function buildStatisticRows(flights: Flight[], dimension: StatDimension, minFlights = 1): StatisticRow[] {
+export function buildStatisticRows(flights: Flight[], dimension: StatDimension, minFlights = 1, positions: Map<string, "КВС" | "2П"> = new Map()): StatisticRow[] {
   if (dimension === "pilots") {
-    return summarizePilots(flights).filter((pilot) => pilot.flights >= minFlights).map((pilot) => ({
+    return summarizePilots(flights, positions).filter((pilot) => pilot.flights >= minFlights).map((pilot) => ({
       id: `${pilot.role}:${pilot.code}:${pilot.aircraftType}`,
       label: pilot.name,
-      subtitle: `${pilot.role} · ${pilot.code} · ${pilot.aircraftType}`,
+      position: pilot.position,
+      subtitle: `${pilot.position} · ${pilot.role} · ${pilot.code} · ${pilot.aircraftType}`,
       flights: pilot.flights,
       metrics: pilot.metrics,
       minMetrics: pilot.minMetrics,
@@ -599,6 +601,17 @@ export function multiHistogramBins(series: Record<string, number[]>, binCount = 
   }
   return bins;
 }
+export function derivePositions(flights: Flight[]): Map<string, "КВС" | "2П"> {
+  const positions = new Map<string, "КВС" | "2П">();
+  for (const flight of flights) {
+    for (const member of flight.crew) {
+      const key = `${member.code}:${flight.aircraftType}`;
+      if (member.role === "CM1") positions.set(key, "КВС");
+      else if (!positions.has(key)) positions.set(key, "2П");
+    }
+  }
+  return positions;
+}
 export type PilotSummary = {
   code: string;
   name: string;
@@ -612,8 +625,9 @@ export type PilotSummary = {
   typeMetrics: Metrics;
   typeMinMetrics: Metrics;
   typeMaxMetrics: Metrics;
+  position: "КВС" | "2П";
 };
-export function summarizePilots(flights: Flight[]): PilotSummary[] {
+export function summarizePilots(flights: Flight[], positions: Map<string, "КВС" | "2П">): PilotSummary[] {
   const groups = new Map<string, { member: CrewMember; aircraftType: string; flights: Flight[] }>();
   for (const flight of flights) for (const member of flight.crew) {
     const key = `${member.role}:${member.code}:${flight.aircraftType}`;
@@ -635,6 +649,7 @@ export function summarizePilots(flights: Flight[]): PilotSummary[] {
       typeMetrics: baselines.get(aircraftType)!.metrics,
       typeMinMetrics: baselines.get(aircraftType)!.minMetrics,
       typeMaxMetrics: baselines.get(aircraftType)!.maxMetrics,
+      position: positions.get(`${member.code}:${aircraftType}`) ?? "2П",
     };
   }).sort((a, b) => {
     const flightDiff = b.flights - a.flights;
@@ -643,5 +658,37 @@ export function summarizePilots(flights: Flight[]): PilotSummary[] {
     const nameA = String(a.name || "");
     const nameB = String(b.name || "");
     return nameA.localeCompare(nameB, "ru");
+  });
+}
+
+export type PilotRow = {
+  code: string;
+  name: string;
+  position: "КВС" | "2П";
+  aircraftType: string;
+  totalFlights: number;
+  summaries: Partial<Record<"CM1" | "CM2", PilotSummary>>;
+};
+
+export function groupPilotRows(pilots: PilotSummary[]): PilotRow[] {
+  const groups = new Map<string, PilotRow>();
+  for (const pilot of pilots) {
+    const key = `${pilot.code}:${pilot.aircraftType}`;
+    const row = groups.get(key) ?? {
+      code: pilot.code,
+      name: pilot.name,
+      position: pilot.position,
+      aircraftType: pilot.aircraftType,
+      totalFlights: 0,
+      summaries: {},
+    };
+    row.summaries[pilot.role] = pilot;
+    row.totalFlights += pilot.flights;
+    groups.set(key, row);
+  }
+  return [...groups.values()].sort((a, b) => {
+    const flightDiff = b.totalFlights - a.totalFlights;
+    if (flightDiff !== 0) return flightDiff;
+    return a.name.localeCompare(b.name, "ru");
   });
 }

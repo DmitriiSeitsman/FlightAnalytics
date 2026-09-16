@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { formatMetric, metricDefinitions, parseFlightRows, parseEventRows, mergeEventsWithFlights, summarizeFlights, summarizePilots, type FlightMetricKey, type ImportResult, type SheetRow, type PilotSummary } from "./flight-data";
+import { formatMetric, metricDefinitions, parseFlightRows, parseEventRows, mergeEventsWithFlights, summarizeFlights, summarizePilots, derivePositions, groupPilotRows, type FlightMetricKey, type ImportResult, type SheetRow, type PilotRow } from "./flight-data";
 import { StatisticsView } from "./statistics-view";
 import { PilotCard } from "./pilot-card";
 import { EventsAnalytics } from "./events-analytics";
@@ -11,7 +11,7 @@ type View = "aircraftType" | "departure" | "arrival" | "flights" | "pilots" | "s
 type SortDirection = "asc" | "desc";
 type ImportProgress = { progress: number; title: string; detail: string };
 type SummarySortKey = "label" | "flights" | FlightMetricKey;
-type PilotSortKey = "name" | "role" | "aircraftType" | "flights" | "ownMin" | "own" | "ownMax" | "baseline" | "delta";
+type PilotSortKey = "name" | "role" | "position" | "aircraftType" | "flights" | "ownMin" | "own" | "ownMax" | "baseline" | "delta";
 type SortRule<Key extends string> = { key: Key; direction: SortDirection };
 
 function SortLabel({ label, unit, active, direction, priority, onToggleActive, onToggleDirection }: { label: string; unit?: string; active: boolean; direction: SortDirection; priority?: number; onToggleActive: () => void; onToggleDirection: () => void }) {
@@ -45,7 +45,7 @@ export default function Home() {
   const [minimumFlights, setMinimumFlights] = useState(3);
   const [summarySort, setSummarySort] = useState<Array<SortRule<SummarySortKey>>>([{ key: "flights", direction: "desc" }]);
   const [pilotSort, setPilotSort] = useState<Array<SortRule<PilotSortKey>>>([{ key: "flights", direction: "desc" }]);
-  const [selectedPilot, setSelectedPilot] = useState<PilotSummary | null>(null);
+  const [selectedPilot, setSelectedPilot] = useState<PilotRow | null>(null);
 
   const importFile = async (file: File) => {
     const showProgress = async (progress: ImportProgress) => {
@@ -151,7 +151,9 @@ export default function Home() {
   const airports = useMemo(() => [...new Set(result?.flights.flatMap((item) => [item.departure, item.arrival]) ?? [])].sort(), [result]);
   const flights = useMemo(() => (result?.flights ?? []).filter((flight) => (!aircraftType || flight.aircraftType === aircraftType) && (!airport || flight.departure === airport || flight.arrival === airport)), [aircraftType, airport, result]);
   const summaries = useMemo(() => view === "pilots" || view === "statistics" || view === "events" || view === "flights" ? [] : summarizeFlights(flights, view), [flights, view]);
-  const pilots = useMemo(() => summarizePilots(flights).filter((pilot) => pilot.flights >= minimumFlights && (!pilotSearch || `${pilot.name} ${pilot.code}`.toLocaleLowerCase("ru-RU").includes(pilotSearch.toLocaleLowerCase("ru-RU")))), [flights, minimumFlights, pilotSearch]);
+  const positions = useMemo(() => derivePositions(result?.flights ?? []), [result]);
+  const pilotSummaries = useMemo(() => summarizePilots(flights, positions).filter((pilot) => pilot.flights >= minimumFlights), [flights, positions, minimumFlights]);
+  const pilots = useMemo(() => groupPilotRows(pilotSummaries).filter((row) => !pilotSearch || `${row.name} ${row.code}`.toLocaleLowerCase("ru-RU").includes(pilotSearch.toLocaleLowerCase("ru-RU"))), [pilotSummaries, pilotSearch]);
   const selectedMetric = metricDefinitions.find((item) => item.key === pilotMetric)!;
   const sortedSummaries = useMemo(() => [...summaries].sort((left, right) => {
     for (const rule of summarySort) {
@@ -163,13 +165,18 @@ export default function Home() {
     return 0;
   }), [summaries, summarySort]);
   const sortedPilots = useMemo(() => [...pilots].sort((left, right) => {
-    const value = (pilot: typeof left, key: PilotSortKey) => {
-      if (["name", "role", "aircraftType", "flights"].includes(key)) return pilot[key as "name" | "role" | "aircraftType" | "flights"];
-      const own = pilot.metrics[pilotMetric];
-      const baseline = pilot.typeMetrics[pilotMetric];
-      if (key === "ownMin") return pilot.minMetrics[pilotMetric];
+    const value = (row: PilotRow, key: PilotSortKey) => {
+      if (key === "name") return row.name;
+      if (key === "position") return row.position;
+      if (key === "aircraftType") return row.aircraftType;
+      if (key === "flights") return row.totalFlights;
+      const primary = row.summaries.CM1 ?? row.summaries.CM2!;
+      if (key === "role") return primary.role;
+      const own = primary.metrics[pilotMetric];
+      const baseline = primary.typeMetrics[pilotMetric];
+      if (key === "ownMin") return primary.minMetrics[pilotMetric];
       if (key === "own") return own;
-      if (key === "ownMax") return pilot.maxMetrics[pilotMetric];
+      if (key === "ownMax") return primary.maxMetrics[pilotMetric];
       if (key === "baseline") return baseline;
       return own !== null && baseline !== null ? own - baseline : null;
     };
@@ -180,7 +187,7 @@ export default function Home() {
     return 0;
   }), [pilotMetric, pilots, pilotSort]);
   const toggleSummaryActive = (key: SummarySortKey) => setSummarySort((current) => current.some((rule) => rule.key === key) ? current.filter((rule) => rule.key !== key) : [...current, { key, direction: key === "label" ? "asc" : "desc" }]);
-  const togglePilotActive = (key: PilotSortKey) => setPilotSort((current) => current.some((rule) => rule.key === key) ? current.filter((rule) => rule.key !== key) : [...current, { key, direction: ["name", "role", "aircraftType"].includes(key) ? "asc" : "desc" }]);
+  const togglePilotActive = (key: PilotSortKey) => setPilotSort((current) => current.some((rule) => rule.key === key) ? current.filter((rule) => rule.key !== key) : [...current, { key, direction: ["name", "role", "position", "aircraftType"].includes(key) ? "asc" : "desc" }]);
   const toggleSummaryDirection = (key: SummarySortKey) => setSummarySort((current) => current.map((rule) => rule.key === key ? { ...rule, direction: rule.direction === "asc" ? "desc" : "asc" } : rule));
   const togglePilotDirection = (key: PilotSortKey) => setPilotSort((current) => current.map((rule) => rule.key === key ? { ...rule, direction: rule.direction === "asc" ? "desc" : "asc" } : rule));
 
@@ -244,16 +251,33 @@ export default function Home() {
         </div>
         <nav className="tabs" aria-label="Разрез аналитики">{([["aircraftType", "Типы ВС"], ["departure", "Аэродромы взлёта"], ["arrival", "Аэродромы посадки"], ["flights", "Рейсы"], ["pilots", "Пилоты"], ["statistics", "Статистика"], ...(result?.events && result.events.length > 0 ? [["events", "События"] as [View, string]] : [])] as Array<[View, string]>).map(([key, label]) => <button type="button" className={view === key ? "active" : ""} key={key} onClick={() => setView(key)}>{label}</button>)}</nav>
         {view !== "statistics" && view !== "flights" && <p className="sort-help">Отметьте галочками нужные столбцы. Цифры показывают порядок сортировки; стрелка меняет направление.<span className="mobile-table-hint">↔ Проведите по таблице влево, чтобы увидеть остальные столбцы.</span></p>}
-        {view === "statistics" ? <StatisticsView flights={flights} sourceFile={fileName} aircraftFilter={aircraftType} airportFilter={airport} /> : view === "events" ? <EventsAnalytics flights={flights} events={result?.events || []} aircraftFilter={aircraftType} airportFilter={airport} /> : view === "flights" ? <FlightsView flights={flights} /> : view === "pilots" ? <>
+        {view === "statistics" ? <StatisticsView flights={flights} sourceFile={fileName} aircraftFilter={aircraftType} airportFilter={airport} positions={positions} /> : view === "events" ? <EventsAnalytics flights={flights} events={result?.events || []} aircraftFilter={aircraftType} airportFilter={airport} /> : view === "flights" ? <FlightsView flights={flights} /> : view === "pilots" ? <>
           <div className="pilot-controls"><label><span>Показатель</span><select value={pilotMetric} onChange={(event) => setPilotMetric(event.target.value as FlightMetricKey)}>{metricDefinitions.map((item) => <option value={item.key} key={item.key}>{item.label}</option>)}</select></label><label><span>Поиск пилота</span><input placeholder="ФИО или табельный номер" value={pilotSearch} onChange={(event) => setPilotSearch(event.target.value)} /></label><label><span>Минимум рейсов</span><input type="number" min="1" value={minimumFlights} onChange={(event) => setMinimumFlights(Math.max(1, Number(event.target.value) || 1))} /></label></div>
           <p className="note">В форме нет признака пилотирующего пилота (PF), поэтому показаны рейсы, где пилот входил в состав экипажа. Нажмите на строку пилота для просмотра детальной информации.</p>
           <div className="table-shell"><table className="pilot-table"><thead><tr>
-            {([['name', 'Пилот'], ['role', 'Роль'], ['aircraftType', 'Тип ВС'], ['flights', 'Рейсов'], ['ownMin', 'Мин. пилота'], ['own', 'Среднее пилота'], ['ownMax', 'Макс. пилота'], ['baseline', 'Среднее типа'], ['delta', 'Разница']] as Array<[PilotSortKey, string]>).map(([key, label]) => {
+            {([['name', 'Пилот'], ['position', 'Должность'], ['role', 'Роль'], ['aircraftType', 'Тип ВС'], ['flights', 'Рейсов'], ['ownMin', 'Мин. пилота'], ['own', 'Среднее пилота'], ['ownMax', 'Макс. пилота'], ['baseline', 'Среднее типа'], ['delta', 'Разница']] as Array<[PilotSortKey, string]>).map(([key, label]) => {
               const rule = pilotSort.find((item) => item.key === key);
               return <th key={key} aria-sort={pilotSort[0]?.key === key ? pilotSort[0].direction === "asc" ? "ascending" : "descending" : "none"}><SortLabel label={label} active={Boolean(rule)} direction={rule?.direction ?? "desc"} priority={pilotSort.findIndex((item) => item.key === key) + 1} onToggleActive={() => togglePilotActive(key)} onToggleDirection={() => togglePilotDirection(key)} /></th>;
             })}
-          </tr></thead><tbody>{sortedPilots.map((pilot) => { const own = pilot.metrics[pilotMetric]; const ownMin = pilot.minMetrics[pilotMetric]; const ownMax = pilot.maxMetrics[pilotMetric]; const baseline = pilot.typeMetrics[pilotMetric]; const delta = own !== null && baseline !== null ? own - baseline : null; return <tr key={`${pilot.role}-${pilot.code}-${pilot.aircraftType}`} className="pilot-row" onClick={() => setSelectedPilot(pilot)}><th>{pilot.name}<small>{pilot.code}</small></th><td>{pilot.role}</td><td>{pilot.aircraftType}</td><td>{pilot.flights}</td><td>{formatMetric(ownMin, pilotMetric, true)}</td><td>{formatMetric(own, pilotMetric, true)}</td><td>{formatMetric(ownMax, pilotMetric, true)}</td><td>{formatMetric(baseline, pilotMetric, true)}</td><td className="delta">{delta === null ? "—" : `${delta > 0 ? "+" : ""}${delta.toLocaleString("ru-RU", { maximumFractionDigits: selectedMetric.digits })} ${selectedMetric.unit}`}</td></tr>; })}</tbody></table></div>
-          {selectedPilot && <PilotCard pilot={selectedPilot} flights={flights} onClose={() => setSelectedPilot(null)} aircraftFilter={aircraftType} airportFilter={airport} />}
+          </tr></thead><tbody>{sortedPilots.map((row) => {
+            const seats = (["CM1", "CM2"] as const).filter((seat) => row.summaries[seat]);
+            const joined = (pick: (s: import("./flight-data").PilotSummary) => string | number) => seats.map((seat) => pick(row.summaries[seat]!)).join(" / ");
+            const primary = row.summaries.CM1 ?? row.summaries.CM2!;
+            const baseline = primary.typeMetrics[pilotMetric];
+            return <tr key={`${row.code}-${row.aircraftType}`} className="pilot-row" onClick={() => setSelectedPilot(row)}>
+              <th>{row.name}<small>{row.code}</small></th>
+              <td>{row.position}</td>
+              <td>{seats.join("/")}</td>
+              <td>{row.aircraftType}</td>
+              <td>{joined((s) => s.flights)}</td>
+              <td>{joined((s) => formatMetric(s.minMetrics[pilotMetric], pilotMetric, true))}</td>
+              <td>{joined((s) => formatMetric(s.metrics[pilotMetric], pilotMetric, true))}</td>
+              <td>{joined((s) => formatMetric(s.maxMetrics[pilotMetric], pilotMetric, true))}</td>
+              <td>{formatMetric(baseline, pilotMetric, true)}</td>
+              <td className="delta">{joined((s) => { const own = s.metrics[pilotMetric]; const d = own !== null && baseline !== null ? own - baseline : null; return d === null ? "—" : `${d > 0 ? "+" : ""}${d.toLocaleString("ru-RU", { maximumFractionDigits: selectedMetric.digits })} ${selectedMetric.unit}`; })}</td>
+            </tr>;
+          })}</tbody></table></div>
+          {selectedPilot && <PilotCard key={`${selectedPilot.code}-${selectedPilot.aircraftType}`} pilotRow={selectedPilot} flights={flights} onClose={() => setSelectedPilot(null)} aircraftFilter={aircraftType} airportFilter={airport} />}
         </> : <div className="table-shell"><table><thead><tr>
           <th aria-sort={summarySort[0]?.key === "label" ? summarySort[0].direction === "asc" ? "ascending" : "descending" : "none"}><SortLabel label={view === "aircraftType" ? "Тип ВС" : "Аэродром"} active={summarySort.some((item) => item.key === "label")} direction={summarySort.find((item) => item.key === "label")?.direction ?? "asc"} priority={summarySort.findIndex((item) => item.key === "label") + 1} onToggleActive={() => toggleSummaryActive("label")} onToggleDirection={() => toggleSummaryDirection("label")} /></th>
           <th aria-sort={summarySort[0]?.key === "flights" ? summarySort[0].direction === "asc" ? "ascending" : "descending" : "none"}><SortLabel label="Рейсов" active={summarySort.some((item) => item.key === "flights")} direction={summarySort.find((item) => item.key === "flights")?.direction ?? "desc"} priority={summarySort.findIndex((item) => item.key === "flights") + 1} onToggleActive={() => toggleSummaryActive("flights")} onToggleDirection={() => toggleSummaryDirection("flights")} /></th>
