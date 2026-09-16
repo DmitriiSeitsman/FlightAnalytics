@@ -269,87 +269,85 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 
 .route-content { display: inline-flex; align-items: center; gap: 6px; }
 
-.flight-detail-card { max-width: 760px; }
+.flight-detail-card { max-width: 780px; }
 
-.flight-detail-route {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 24px 20px;
-  padding: 14px 18px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: #f8fafb;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--ink);
-}
+/* Шапка карточки рейса: тёмная плашка забирает на себя идентификацию рейса и маршрут. */
+.fd-head { position: relative; padding: 22px 24px 20px; background: var(--navy); color: white; }
 
-.flight-detail-times { font-size: 11px; font-weight: 600; color: #63717d; }
+.fd-head .pilot-card-close { position: absolute; top: 16px; right: 16px; background: rgba(255, 255, 255, 0.14); color: white; }
 
-.flight-detail-section { margin: 0 24px 24px; }
+.fd-head .pilot-card-close:hover { background: var(--red); color: white; }
 
-.flight-detail-section h3 {
-  margin: 0 0 12px;
-  color: var(--ink);
-  font-size: 14px;
-  letter-spacing: -0.01em;
-}
+.fd-title { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding-right: 44px; }
 
-.flight-detail-crew {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
+.fd-title h2 { margin: 0; font-size: 24px; letter-spacing: -0.02em; }
 
-.flight-detail-crew li {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: white;
-}
+.fd-title span { font-size: 11px; font-weight: 700; color: #adc3dd; }
 
-.flight-detail-crew-role {
-  align-self: flex-start;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: #eaf1f5;
-  color: var(--navy);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
+.fd-route { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; font-size: 15px; font-weight: 700; }
 
-.flight-detail-crew-name { font-size: 13px; font-weight: 700; color: var(--ink); }
-.flight-detail-crew-code { font-size: 11px; color: #63717d; }
+.fd-route i { color: #7fa5d0; }
 
-.flight-detail-metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 10px;
-}
+.fd-route em { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 600; color: #adc3dd; font-variant-numeric: tabular-nums; }
 
-.flight-detail-metric {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #f8fafb;
-}
+.fd-body { display: flex; flex-direction: column; gap: 22px; padding: 20px 24px 24px; }
 
-.flight-detail-metric span { font-size: 9px; color: #74818a; letter-spacing: 0.03em; text-transform: uppercase; }
-.flight-detail-metric strong { font-size: 15px; color: var(--ink); letter-spacing: -0.02em; }
+.fd-block-title { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; color: #74818a; font-size: 9.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+
+.fd-block-note { font-weight: 600; letter-spacing: 0.02em; text-transform: none; color: #94a1aa; }
+
+.fd-crew { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 0; list-style: none; }
+
+.fd-crew li { display: flex; flex: 1 1 230px; }
+
+.fd-crew-item { display: flex; width: 100%; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 11px; background: white; text-align: left; }
+
+.fd-crew-item.is-link { cursor: pointer; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+
+.fd-crew-item.is-link:hover { border-color: var(--navy); box-shadow: 0 6px 16px rgba(24, 57, 100, 0.12); }
+
+.fd-crew-item.is-link:focus-visible { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(24, 57, 100, 0.18); }
+
+.fd-crew-go { margin-left: auto; color: #b3bfc8; font-style: normal; font-size: 13px; transition: color 0.15s ease, transform 0.15s ease; }
+
+.fd-crew-item.is-link:hover .fd-crew-go { color: var(--navy); transform: translateX(2px); }
+
+@media (prefers-reduced-motion: reduce) { .fd-crew-item.is-link, .fd-crew-go { transition: none; } .fd-crew-item.is-link:hover .fd-crew-go { transform: none; } }
+
+.fd-crew b { display: block; font-size: 12.5px; }
+
+.fd-crew small { display: block; margin-top: 2px; color: #74818a; font-size: 10.5px; }
+
+.fd-seat { flex: 0 0 auto; padding: 3px 8px; border-radius: 6px; background: #fdecef; color: var(--red); font-size: 9.5px; font-weight: 800; letter-spacing: 0.04em; }
+
+.fd-seat.is-second { background: #e8f4ef; color: #14684a; }
+
+.fd-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; }
+
+.fd-metric { padding: 10px 0; border-bottom: 1px solid #eef1f3; }
+
+.fd-metric-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+
+.fd-metric-top span { color: #74818a; font-size: 11px; }
+
+.fd-metric-top b { font-size: 14px; font-variant-numeric: tabular-nums; }
+
+.fd-metric-top b.is-alert { color: var(--red); }
+
+/* Полоса — диапазон по типу ВС, точка — этот рейс, штрих — среднее по типу. */
+.fd-range { position: relative; height: 12px; margin-top: 7px; }
+
+.fd-range-track { position: absolute; top: 4px; right: 0; left: 0; height: 4px; border-radius: 99px; background: #e3e9ef; }
+
+.fd-range-avg { position: absolute; top: 1px; width: 2px; height: 10px; border-radius: 1px; background: var(--navy); opacity: 0.45; transform: translateX(-1px); }
+
+.fd-range-dot { position: absolute; top: 1px; width: 10px; height: 10px; border: 2px solid white; border-radius: 50%; background: var(--navy); transform: translateX(-5px); }
+
+.fd-range-dot.is-alert { background: var(--red); }
+
+.fd-range-edge { position: absolute; top: 2px; left: -1px; width: 0; height: 0; border-top: 4px solid transparent; border-right: 7px solid #8c9aa6; border-bottom: 4px solid transparent; }
+
+.fd-range-edge.is-high { right: -1px; left: auto; border-right: 0; border-left: 7px solid #8c9aa6; }
 
 .flight-detail-events {
   display: flex;
@@ -366,6 +364,7 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
   gap: 12px;
   padding: 12px 14px;
   border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
   border-radius: 10px;
   background: white;
 }

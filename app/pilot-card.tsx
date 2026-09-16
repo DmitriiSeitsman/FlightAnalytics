@@ -11,6 +11,9 @@ interface PilotCardProps {
   pilotRow: PilotRow;
   flights: Flight[];
   onClose: () => void;
+  // Должности всего лётного состава: нужны карточке рейса, где в экипаже и второй пилот.
+  positions?: Map<string, "КВС" | "2П">;
+  onSelectPilot?: (code: string, aircraftType: string) => void;
 }
 
 type FlightSortKey = "date" | "flightNumber" | "route" | "departureTime" | "arrivalTime" | "board" | "role" | FlightMetricKey;
@@ -18,7 +21,7 @@ type SortDirection = "asc" | "desc";
 
 type PilotCardTab = "stats" | "flights";
 
-export function PilotCard({ pilotRow, flights, onClose }: PilotCardProps) {
+export function PilotCard({ pilotRow, flights, onClose, positions, onSelectPilot }: PilotCardProps) {
   // Компонент монтируется заново при смене pilotRow (см. key в page.tsx), поэтому выбор ролей
   // корректно сбрасывается на дефолт без эффекта.
   const availableSeats = (["CM1", "CM2"] as const).filter((seat) => pilotRow.summaries[seat]);
@@ -479,7 +482,13 @@ export function PilotCard({ pilotRow, flights, onClose }: PilotCardProps) {
         </div>}
       </div>
     </div>
-    {selectedFlight && <FlightDetailCard flight={selectedFlight} onClose={() => setSelectedFlight(null)} />}
+    {selectedFlight && <FlightDetailCard
+      flight={selectedFlight}
+      onClose={() => setSelectedFlight(null)}
+      positions={positions}
+      typeSummary={{ metrics: pilot.typeMetrics, minMetrics: pilot.typeMinMetrics, maxMetrics: pilot.typeMaxMetrics }}
+      onSelectPilot={onSelectPilot && ((code, type) => { setSelectedFlight(null); onSelectPilot(code, type); })}
+    />}
     </>
   );
 }

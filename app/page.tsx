@@ -154,6 +154,14 @@ export default function Home() {
   const positions = useMemo(() => derivePositions(result?.flights ?? []), [result]);
   const pilotSummaries = useMemo(() => summarizePilots(flights, positions).filter((pilot) => pilot.flights >= minimumFlights), [flights, positions, minimumFlights]);
   const pilots = useMemo(() => groupPilotRows(pilotSummaries).filter((row) => !pilotSearch || `${row.name} ${row.code}`.toLocaleLowerCase("ru-RU").includes(pilotSearch.toLocaleLowerCase("ru-RU"))), [pilotSummaries, pilotSearch]);
+  const pilotIndex = useMemo(
+    () => new Map(groupPilotRows(summarizePilots(flights, positions)).map((row) => [`${row.code}:${row.aircraftType}`, row])),
+    [flights, positions],
+  );
+  const openPilotCard = (code: string, aircraftType: string) => {
+    const row = pilotIndex.get(`${code}:${aircraftType}`);
+    if (row) setSelectedPilot(row);
+  };
   const selectedMetric = metricDefinitions.find((item) => item.key === pilotMetric)!;
   const sortedSummaries = useMemo(() => [...summaries].sort((left, right) => {
     for (const rule of summarySort) {
@@ -251,7 +259,7 @@ export default function Home() {
         </div>
         <nav className="tabs" aria-label="Разрез аналитики">{([["aircraftType", "Типы ВС"], ["departure", "Аэродромы взлёта"], ["arrival", "Аэродромы посадки"], ["flights", "Рейсы"], ["pilots", "Пилоты"], ["statistics", "Статистика"], ...(result?.events && result.events.length > 0 ? [["events", "События"] as [View, string]] : [])] as Array<[View, string]>).map(([key, label]) => <button type="button" className={view === key ? "active" : ""} key={key} onClick={() => setView(key)}>{label}</button>)}</nav>
         {view !== "statistics" && view !== "flights" && <p className="sort-help">Отметьте галочками нужные столбцы. Цифры показывают порядок сортировки; стрелка меняет направление.<span className="mobile-table-hint">↔ Проведите по таблице влево, чтобы увидеть остальные столбцы.</span></p>}
-        {view === "statistics" ? <StatisticsView flights={flights} sourceFile={fileName} aircraftFilter={aircraftType} airportFilter={airport} positions={positions} /> : view === "events" ? <EventsAnalytics flights={flights} events={result?.events || []} aircraftFilter={aircraftType} airportFilter={airport} /> : view === "flights" ? <FlightsView flights={flights} /> : view === "pilots" ? <>
+        {view === "statistics" ? <StatisticsView flights={flights} sourceFile={fileName} aircraftFilter={aircraftType} airportFilter={airport} positions={positions} /> : view === "events" ? <EventsAnalytics flights={flights} events={result?.events || []} aircraftFilter={aircraftType} airportFilter={airport} /> : view === "flights" ? <FlightsView flights={flights} positions={positions} onSelectPilot={openPilotCard} /> : view === "pilots" ? <>
           <div className="pilot-controls"><label><span>Показатель</span><select value={pilotMetric} onChange={(event) => setPilotMetric(event.target.value as FlightMetricKey)}>{metricDefinitions.map((item) => <option value={item.key} key={item.key}>{item.label}</option>)}</select></label><label><span>Поиск пилота</span><input placeholder="ФИО или табельный номер" value={pilotSearch} onChange={(event) => setPilotSearch(event.target.value)} /></label><label><span>Минимум рейсов</span><input type="number" min="1" value={minimumFlights} onChange={(event) => setMinimumFlights(Math.max(1, Number(event.target.value) || 1))} /></label></div>
           <p className="note">В форме нет признака пилотирующего пилота (PF), поэтому показаны рейсы, где пилот входил в состав экипажа. Нажмите на строку пилота для просмотра детальной информации.</p>
           <div className="table-shell"><table className="pilot-table"><thead><tr>
@@ -277,7 +285,6 @@ export default function Home() {
               <td className="delta">{joined((s) => { const own = s.metrics[pilotMetric]; const d = own !== null && baseline !== null ? own - baseline : null; return d === null ? "—" : `${d > 0 ? "+" : ""}${d.toLocaleString("ru-RU", { maximumFractionDigits: selectedMetric.digits })} ${selectedMetric.unit}`; })}</td>
             </tr>;
           })}</tbody></table></div>
-          {selectedPilot && <PilotCard key={`${selectedPilot.code}-${selectedPilot.aircraftType}`} pilotRow={selectedPilot} flights={flights} onClose={() => setSelectedPilot(null)} />}
         </> : <div className="table-shell"><table><thead><tr>
           <th aria-sort={summarySort[0]?.key === "label" ? summarySort[0].direction === "asc" ? "ascending" : "descending" : "none"}><SortLabel label={view === "aircraftType" ? "Тип ВС" : "Аэродром"} active={summarySort.some((item) => item.key === "label")} direction={summarySort.find((item) => item.key === "label")?.direction ?? "asc"} priority={summarySort.findIndex((item) => item.key === "label") + 1} onToggleActive={() => toggleSummaryActive("label")} onToggleDirection={() => toggleSummaryDirection("label")} /></th>
           <th aria-sort={summarySort[0]?.key === "flights" ? summarySort[0].direction === "asc" ? "ascending" : "descending" : "none"}><SortLabel label="Рейсов" active={summarySort.some((item) => item.key === "flights")} direction={summarySort.find((item) => item.key === "flights")?.direction ?? "desc"} priority={summarySort.findIndex((item) => item.key === "flights") + 1} onToggleActive={() => toggleSummaryActive("flights")} onToggleDirection={() => toggleSummaryDirection("flights")} /></th>
@@ -287,6 +294,14 @@ export default function Home() {
           })}
         </tr></thead><tbody>{sortedSummaries.map((row) => <tr key={row.label}><th>{row.label}</th><td>{row.flights.toLocaleString("ru-RU")}</td>{metricDefinitions.map((item) => <td key={item.key}>{formatMetric(row.metrics[item.key], item.key)}</td>)}</tr>)}</tbody></table></div>}
         <p className="method">Эшелон полёта — среднее заполненных значений BD–BK. Пустые значения исключаются. Дубли определяются по дате, времени, номеру рейса и борту.</p>
+        {selectedPilot && <PilotCard
+          key={`${selectedPilot.code}-${selectedPilot.aircraftType}`}
+          pilotRow={selectedPilot}
+          flights={flights}
+          onClose={() => setSelectedPilot(null)}
+          positions={positions}
+          onSelectPilot={openPilotCard}
+        />}
       </>}
     </section>
   </main>;

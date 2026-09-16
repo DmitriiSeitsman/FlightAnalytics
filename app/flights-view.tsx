@@ -1,18 +1,25 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { formatFlightDate, normalizeFlightDate, shortenPilotName, worstEventColor, summarizeEventColors, type Flight } from "./flight-data";
+import { formatFlightDate, normalizeFlightDate, shortenPilotName, summarizeFlights, worstEventColor, summarizeEventColors, type Flight } from "./flight-data";
 import { COLOR_LABELS, COLOR_STYLES } from "./events-analytics";
-import { FlightDetailCard } from "./flight-detail-card";
+import { FlightDetailCard, type FlightTypeSummary } from "./flight-detail-card";
 
 interface FlightsViewProps {
   flights: Flight[];
+  positions?: Map<string, "КВС" | "2П">;
+  onSelectPilot?: (code: string, aircraftType: string) => void;
 }
 
 type FlightsSortKey = "date" | "flightNumber" | "route" | "departureTime" | "arrivalTime" | "board" | "aircraftType";
 type SortDirection = "asc" | "desc";
 
-export function FlightsView({ flights }: FlightsViewProps) {
+export function FlightsView({ flights, positions, onSelectPilot }: FlightsViewProps) {
+  // Диапазоны по типам ВС для полос в карточке рейса: считаем один раз на всю выборку.
+  const typeSummaries = useMemo(
+    () => new Map<string, FlightTypeSummary>(summarizeFlights(flights, "aircraftType").map((item) => [item.label, item])),
+    [flights],
+  );
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<{ key: FlightsSortKey; direction: SortDirection }>({ key: "date", direction: "asc" });
   const [currentPage, setCurrentPage] = useState(1);
@@ -162,7 +169,13 @@ export function FlightsView({ flights }: FlightsViewProps) {
         </div>
       )}
 
-      {selectedFlight && <FlightDetailCard flight={selectedFlight} onClose={() => setSelectedFlight(null)} />}
+      {selectedFlight && <FlightDetailCard
+        flight={selectedFlight}
+        onClose={() => setSelectedFlight(null)}
+        positions={positions}
+        typeSummary={typeSummaries.get(selectedFlight.aircraftType)}
+        onSelectPilot={onSelectPilot && ((code, type) => { setSelectedFlight(null); onSelectPilot(code, type); })}
+      />}
     </div>
   );
 }
