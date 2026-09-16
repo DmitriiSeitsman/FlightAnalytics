@@ -1,6 +1,6 @@
 import type { Content, TableCell, TDocumentDefinitions } from "pdfmake/interfaces";
-import { formatMetric, metricDefinitions, type FlightMetricKey, type MultiHistogramBin, type PilotSummary, type StatisticRow, type StatDimension, statDimensionLabels } from "./flight-data";
-import { comparisonRangeSvg, normalizedDistributionSvg, pilotProfileSvg, pilotProfileLegendSvg, type ChartSeries, type PilotProfileAxis } from "./histogram";
+import { formatFlightDate, formatMetric, metricDefinitions, type FlightMetricKey, type MultiHistogramBin, type PilotSummary, type StatisticRow, type StatDimension, statDimensionLabels } from "./flight-data";
+import { comparisonRangeSvg, normalizedDistributionSvg, pilotProfileSvg, pilotProfileLegendSvg, SEAT_COLORS, type ChartSeries, type PilotProfileAxis } from "./histogram";
 
 export type StatisticReport = {
   generatedAt: Date;
@@ -206,11 +206,13 @@ export async function downloadStatisticPdf(report: StatisticReport) {
 export type PilotReport = {
   generatedAt: Date;
   pilot: PilotSummary;
+  // Вторая выбранная роль в экипаже, если в карточке включены обе.
+  secondary?: PilotSummary;
   profileAxes: PilotProfileAxis[];
   selectedMetric: FlightMetricKey;
-  flightsInScope: number;
-  aircraftFilter: string;
-  airportFilter: string;
+  // Фактические даты первого и последнего рейса, попавших в статистику (ISO, YYYY-MM-DD).
+  periodFrom: string | null;
+  periodTo: string | null;
   avatarDataUrl: string;
 };
 
@@ -218,8 +220,18 @@ const reportLabel = (text: string): Content => ({ text, fontSize: 7, bold: true,
 const reportValue = (text: string, options: Partial<Content> = {}): Content => ({ text, fontSize: 10, bold: true, color: INK, margin: [0, 0, 0, 7], ...options } as Content);
 
 export function buildPilotReportPdfDocument(dossier: PilotReport): TDocumentDefinitions {
-  const { pilot } = dossier;
-  const profile = pilotProfileSvg(dossier.profileAxes, dossier.selectedMetric);
+  const { pilot, secondary } = dossier;
+  // Досье повторяет выбор пользователя в карточке: одна роль или обе, в тех же цветах.
+  const summaries = secondary ? [pilot, secondary] : [pilot];
+  const seatAccent = SEAT_COLORS[pilot.role];
+  const secondAccent = secondary ? SEAT_COLORS[secondary.role] : undefined;
+  const bySeat = (pick: (summary: PilotSummary) => string) => summaries.map(pick).join(" / ");
+  // Период считается по фактическим датам первого и последнего рейса, попавших в статистику.
+  const periodText = dossier.periodFrom && dossier.periodTo
+    ? `${formatFlightDate(dossier.periodFrom)} — ${formatFlightDate(dossier.periodTo)}`
+    : "—";
+  const generatedText = `${dossier.generatedAt.toLocaleDateString("ru-RU")}, ${dossier.generatedAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`;
+  const profile = pilotProfileSvg(dossier.profileAxes, dossier.selectedMetric, seatAccent, secondAccent ?? SEAT_COLORS.CM2);
 
   const headerCell = (text: string, options: Partial<TableCell> = {}): TableCell => ({ text, bold: true, fontSize: 7, color: "#687985", fillColor: "#f3f6f7", alignment: "center", margin: [2, 3, 2, 3], ...options });
   const groupCell = (text: string, span: number, color: string, fill: string): TableCell => ({ text, colSpan: span, bold: true, fontSize: 7, color, fillColor: fill, alignment: "center", margin: [2, 3, 2, 3] });
@@ -227,7 +239,7 @@ export function buildPilotReportPdfDocument(dossier: PilotReport): TDocumentDefi
   const tableBody: TableCell[][] = [
     [
       headerCell("Показатель", { rowSpan: 2, alignment: "left" }),
-      groupCell("Пилот", 4, "#a8182b", "#fdf1f3"), {}, {}, {},
+      groupCell(summaries.map((summary) => summary.role).join(" / "), 4, pilot.role === "CM2" ? "#14684a" : "#a8182b", pilot.role === "CM2" ? "#e9f4ef" : "#fdf1f3"), {}, {}, {},
       groupCell(`Тип ВС · ${pilot.aircraftType}`, 3, NAVY, "#edf2fa"), {}, {},
       headerCell("Разница", { rowSpan: 2 }),
     ],
@@ -238,23 +250,24 @@ export function buildPilotReportPdfDocument(dossier: PilotReport): TDocumentDefi
       {},
     ],
     ...metricDefinitions.map((item): TableCell[] => {
-      const own = pilot.metrics[item.key];
       const baseline = pilot.typeMetrics[item.key];
-      const delta = own !== null && baseline !== null ? own - baseline : null;
       const selected = item.key === dossier.selectedMetric;
       const fill = selected ? "#fdeef0" : undefined;
-      const cell = (value: number | null, options: Partial<TableCell> = {}): TableCell =>
-        ({ text: formatMetric(value, item.key), alignment: "right", fillColor: fill, margin: [3, 2.5, 3, 2.5], ...options });
+      const cell = (text: string, options: Partial<TableCell> = {}): TableCell =>
+        ({ text, alignment: "right", fillColor: fill, margin: [3, 2.5, 3, 2.5], ...options });
       return [
         { text: `${item.label}, ${item.unit}`, bold: true, color: selected ? RED : INK, fillColor: fill, margin: [3, 2.5, 3, 2.5] },
-        cell(pilot.minMetrics[item.key]),
-        cell(own, { bold: true }),
-        cell(pilot.maxMetrics[item.key]),
-        cell(pilot.medianMetrics[item.key]),
-        cell(pilot.typeMinMetrics[item.key]),
-        cell(baseline, { bold: true }),
-        cell(pilot.typeMaxMetrics[item.key]),
-        { text: deltaText(delta, item.key), alignment: "right", bold: true, fillColor: fill, margin: [3, 2.5, 3, 2.5] },
+        cell(bySeat((summary) => formatMetric(summary.minMetrics[item.key], item.key))),
+        cell(bySeat((summary) => formatMetric(summary.metrics[item.key], item.key)), { bold: true }),
+        cell(bySeat((summary) => formatMetric(summary.maxMetrics[item.key], item.key))),
+        cell(bySeat((summary) => formatMetric(summary.medianMetrics[item.key], item.key))),
+        cell(formatMetric(pilot.typeMinMetrics[item.key], item.key)),
+        cell(formatMetric(baseline, item.key), { bold: true }),
+        cell(formatMetric(pilot.typeMaxMetrics[item.key], item.key)),
+        cell(bySeat((summary) => {
+          const own = summary.metrics[item.key];
+          return deltaText(own !== null && baseline !== null ? own - baseline : null, item.key);
+        }), { bold: true }),
       ];
     }),
   ];
@@ -265,7 +278,13 @@ export function buildPilotReportPdfDocument(dossier: PilotReport): TDocumentDefi
     pageMargins: [30, 30, 30, 34],
     info: { title: `Карточка пилота — ${pilot.name}`, subject: `Табельный № ${pilot.code}`, creator: "Flight Analytics" },
     defaultStyle: { font: "Roboto", fontSize: 8, color: INK },
-    footer: (currentPage, pageCount) => ({ text: `Flight Analytics · карточка пилота · ${currentPage} / ${pageCount}`, alignment: "right", color: MUTED, fontSize: 7, margin: [0, 8, 30, 0] }),
+    footer: (currentPage, pageCount) => ({
+      columns: [
+        { text: `Период выборки: ${periodText} · сформировано ${generatedText}`, alignment: "left", color: MUTED, fontSize: 7 },
+        { text: `Flight Analytics · карточка пилота · ${currentPage} / ${pageCount}`, alignment: "right", color: MUTED, fontSize: 7 },
+      ],
+      margin: [30, 8, 30, 0],
+    } as Content),
     styles: {
       title: { fontSize: 18, bold: true, color: NAVY },
       eyebrow: { fontSize: 7, bold: true, color: RED, characterSpacing: 1.1 },
@@ -287,18 +306,18 @@ export function buildPilotReportPdfDocument(dossier: PilotReport): TDocumentDefi
               reportLabel("ДОЛЖНОСТЬ"),
               reportValue(pilot.position === "КВС" ? "Командир воздушного судна" : "Второй пилот", { color: NAVY }),
               reportLabel("РОЛЬ В ЭКИПАЖЕ"),
-              reportValue(pilot.role),
+              reportValue(summaries.map((summary) => summary.role).join(" / "), { color: secondary ? NAVY : INK }),
               reportLabel("ТИП ВС"),
               reportValue(pilot.aircraftType),
               reportLabel("РЕЙСОВ В ВЫБОРКЕ"),
-              reportValue(String(dossier.flightsInScope), { margin: [0, 0, 0, 0] }),
+              reportValue(bySeat((summary) => String(summary.flights)), { margin: [0, 0, 0, 0] }),
             ],
           },
           {
             width: "*",
             stack: [
               { text: "Профиль по всем показателям", style: "sectionTitle", margin: [0, 0, 0, 3] },
-              { svg: pilotProfileLegendSvg(), width: 516, margin: [0, 0, 0, 7] },
+              { svg: pilotProfileLegendSvg(secondary ? { pilotColor: seatAccent, primaryLabel: pilot.role, secondaryColor: secondAccent, secondaryLabel: secondary.role } : { pilotColor: seatAccent }), width: 516, margin: [0, 0, 0, 7] },
               ...(profile ? [{ svg: profile, width: 516 } as Content] : [{ text: "Нет данных для профиля.", color: MUTED } as Content]),
             ],
           },
@@ -307,14 +326,17 @@ export function buildPilotReportPdfDocument(dossier: PilotReport): TDocumentDefi
       },
       { text: "Показатели пилота и типа ВС", style: "sectionTitle" },
       {
-        table: { headerRows: 2, dontBreakRows: true, widths: [152, "*", "*", "*", "*", "*", "*", "*", 50], body: tableBody },
+        table: {
+          headerRows: 2,
+          dontBreakRows: true,
+          // При двух ролях в колонках пилота стоит «значение / значение» — им нужна ширина,
+          // иначе текст переносится на вторую строку и таблица уезжает на следующую страницу.
+          widths: secondary
+            ? [152, "*", "*", "*", "*", 46, 46, 46, 74]
+            : [152, "*", "*", "*", "*", "*", "*", "*", 50],
+          body: tableBody,
+        },
         layout: "lightHorizontalLines",
-      },
-      {
-        text: `Фильтры выборки: тип ВС — ${dossier.aircraftFilter || "все"}; аэропорт — ${dossier.airportFilter || "все"}. Сформировано ${dossier.generatedAt.toLocaleString("ru-RU")}.`,
-        color: MUTED,
-        fontSize: 7,
-        margin: [0, 10, 0, 0],
       },
     ],
   };

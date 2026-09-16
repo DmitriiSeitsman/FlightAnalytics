@@ -3,11 +3,15 @@ import { formatMetric, type FlightMetricKey, type HistogramBin, type MultiHistog
 
 const NAVY = "#183964";
 const RED = "#d52238";
+const GREEN = "#19805b";
 const GRID = "#d7e0e6";
 const INK = "#14243a";
 const MUTED = "#74818a";
 
 export const SERIES_COLORS = [RED, NAVY, "#19805b", "#7c3aed", "#d97706"] as const;
+// Цвет закреплён за ролью в экипаже: CM1 всегда красный, CM2 всегда зелёный —
+// и когда выбраны обе роли, и когда только одна (в том числе у «чистых» 2П).
+export const SEAT_COLORS = { CM1: RED, CM2: GREEN } as const;
 
 export type ChartSeries = {
   id: string;
@@ -442,6 +446,10 @@ export type PilotProfileAxis = {
   typeAvg: number | null;
   typeMin: number | null;
   typeMax: number | null;
+  // Вторая роль в экипаже (CM2), если выбраны обе: рисуется второй дорожкой зелёным.
+  pilot2Min?: number | null;
+  pilot2Max?: number | null;
+  pilot2Avg?: number | null;
 };
 
 const PROFILE_WIDTH = 600;
@@ -475,6 +483,9 @@ type ProfileRowLayout = {
   bandFrom: number | null;
   bandWidth: number;
   pilotX: number | null;
+  band2From: number | null;
+  band2Width: number;
+  pilot2X: number | null;
   typeX: number | null;
 };
 
@@ -497,6 +508,8 @@ function layoutPilotProfile(axes: PilotProfileAxis[], selectedMetric: FlightMetr
     const trackFrom = xFor(typeMin);
     const hasPilotRange = axis.pilotMin !== null && axis.pilotMax !== null;
     const bandFrom = hasPilotRange ? xFor(axis.pilotMin as number) : null;
+    const hasSecondRange = axis.pilot2Min !== null && axis.pilot2Min !== undefined && axis.pilot2Max !== null && axis.pilot2Max !== undefined;
+    const band2From = hasSecondRange ? xFor(axis.pilot2Min as number) : null;
 
     return {
       axis,
@@ -509,6 +522,9 @@ function layoutPilotProfile(axes: PilotProfileAxis[], selectedMetric: FlightMetr
       bandFrom,
       bandWidth: bandFrom === null ? 0 : Math.max(PROFILE_BAND_H, xFor(axis.pilotMax as number) - bandFrom),
       pilotX: axis.pilotAvg === null ? null : xFor(axis.pilotAvg),
+      band2From,
+      band2Width: band2From === null ? 0 : Math.max(PROFILE_BAND_H, xFor(axis.pilot2Max as number) - band2From),
+      pilot2X: axis.pilot2Avg === null || axis.pilot2Avg === undefined ? null : xFor(axis.pilot2Avg),
       typeX: axis.typeAvg === null ? null : xFor(axis.typeAvg),
     };
   });
@@ -520,12 +536,25 @@ function layoutPilotProfile(axes: PilotProfileAxis[], selectedMetric: FlightMetr
   };
 }
 
-const profileRowTitle = (axis: PilotProfileAxis, pilotLabel: string, baselineLabel: string) => {
-  const pilotPart = axis.pilotAvg !== null
-    ? `${pilotLabel}: ${formatMetric(axis.pilotMin, axis.key, true)} – ${formatMetric(axis.pilotMax, axis.key, true)}, среднее ${formatMetric(axis.pilotAvg, axis.key, true)}`
-    : `${pilotLabel}: нет данных`;
+const profileSeriesPart = (axis: PilotProfileAxis, label: string, min: number | null, max: number | null, avg: number | null) =>
+  avg !== null
+    ? `${label}: ${formatMetric(min, axis.key, true)} – ${formatMetric(max, axis.key, true)}, среднее ${formatMetric(avg, axis.key, true)}`
+    : `${label}: нет данных`;
+
+const profileRowTitle = (axis: PilotProfileAxis, pilotLabel: string, baselineLabel: string, primaryLabel?: string, secondaryLabel?: string) => {
+  const hasSecond = axis.pilot2Avg !== null && axis.pilot2Avg !== undefined;
+  const pilotPart = profileSeriesPart(
+    axis,
+    hasSecond && primaryLabel ? `${pilotLabel} (${primaryLabel})` : pilotLabel,
+    axis.pilotMin,
+    axis.pilotMax,
+    axis.pilotAvg,
+  );
+  const secondPart = hasSecond
+    ? ` ${profileSeriesPart(axis, `${pilotLabel} (${secondaryLabel ?? "CM2"})`, axis.pilot2Min ?? null, axis.pilot2Max ?? null, axis.pilot2Avg ?? null)}.`
+    : "";
   const typePart = `${baselineLabel}: ${formatMetric(axis.typeMin, axis.key, true)} – ${formatMetric(axis.typeMax, axis.key, true)}, среднее ${formatMetric(axis.typeAvg, axis.key, true)}`;
-  return `${axis.label}. ${pilotPart}. ${typePart}.`;
+  return `${axis.label}. ${pilotPart}.${secondPart} ${typePart}.`;
 };
 
 // Профиль пилота: по строке на показатель. Голубая дорожка — диапазон типа ВС (минимум→максимум),
@@ -536,11 +565,19 @@ export function PilotRangeProfile({
   selectedMetric,
   pilotLabel,
   baselineLabel,
+  primaryLabel,
+  secondaryLabel,
+  primaryColor = RED,
+  secondaryColor = GREEN,
 }: {
   axes: PilotProfileAxis[];
   selectedMetric: FlightMetricKey;
   pilotLabel: string;
   baselineLabel: string;
+  primaryLabel?: string;
+  secondaryLabel?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
 }) {
   const { rows, height, valueX } = layoutPilotProfile(axes, selectedMetric);
   if (!rows.length) return <p className="note">Недостаточно данных для профиля пилота.</p>;
@@ -554,9 +591,16 @@ export function PilotRangeProfile({
           aria-label={`Профиль ${pilotLabel}: диапазон и среднее по каждому показателю в сравнении с диапазоном по ${baselineLabel}`}
           preserveAspectRatio="xMidYMid meet"
         >
-          {rows.map(({ axis, top, rowHeight, mid, selected, trackFrom, trackWidth, bandFrom, bandWidth, pilotX, typeX }) => (
+          {rows.map(({ axis, top, rowHeight, mid, selected, trackFrom, trackWidth, bandFrom, bandWidth, pilotX, band2From, band2Width, pilot2X, typeX }) => {
+            // Когда выбраны обе роли, строка делится на две дорожки: CM1 выше центра, CM2 ниже.
+            const split = pilot2X !== null || band2From !== null;
+            const lane = split ? 3 : 0;
+            const bandHeight = split ? 5 : PROFILE_BAND_H;
+            const dotRadius = split ? 3.6 : 4;
+            const textLane = split ? 5.5 : 0;
+            return (
             <g key={axis.key}>
-              <title>{profileRowTitle(axis, pilotLabel, baselineLabel)}</title>
+              <title>{profileRowTitle(axis, pilotLabel, baselineLabel, primaryLabel, secondaryLabel)}</title>
               <rect x="0" y={top + 1} width={PROFILE_WIDTH} height={rowHeight - 2} rx="8" fill={selected ? `${RED}0f` : "transparent"} />
 
               <text
@@ -574,7 +618,11 @@ export function PilotRangeProfile({
               <rect x={trackFrom} y={mid - PROFILE_TRACK_H / 2} width={trackWidth} height={PROFILE_TRACK_H} rx={PROFILE_TRACK_H / 2} fill={PROFILE_TRACK_FILL} />
 
               {bandFrom !== null && (
-                <rect x={bandFrom} y={mid - PROFILE_BAND_H / 2} width={bandWidth} height={PROFILE_BAND_H} rx={PROFILE_BAND_H / 2} fill={RED} fillOpacity="0.32" />
+                <rect x={bandFrom} y={mid - lane - bandHeight / 2} width={bandWidth} height={bandHeight} rx={bandHeight / 2} fill={primaryColor} fillOpacity="0.32" />
+              )}
+
+              {band2From !== null && (
+                <rect x={band2From} y={mid + lane - bandHeight / 2} width={band2Width} height={bandHeight} rx={bandHeight / 2} fill={secondaryColor} fillOpacity="0.3" />
               )}
 
               {typeX !== null && (
@@ -591,9 +639,9 @@ export function PilotRangeProfile({
 
               {pilotX !== null && (
                 <>
-                  <circle cx={pilotX} cy={mid} r="4" fill={RED} stroke="white" strokeWidth="2" />
-                  {selected && (
-                    <g transform={`translate(${pilotX - PROFILE_ICON / 2}, ${mid + PROFILE_TRACK_H / 2 + PROFILE_ICON_GAP}) scale(${PROFILE_ICON / 24})`} fill={RED}>
+                  <circle cx={pilotX} cy={mid - lane} r={dotRadius} fill={primaryColor} stroke="white" strokeWidth="2" />
+                  {selected && !split && (
+                    <g transform={`translate(${pilotX - PROFILE_ICON / 2}, ${mid + PROFILE_TRACK_H / 2 + PROFILE_ICON_GAP}) scale(${PROFILE_ICON / 24})`} fill={primaryColor}>
                       <path d={PILOT_HEAD_PATH} />
                       <path d={PILOT_BODY_PATH} />
                     </g>
@@ -601,11 +649,27 @@ export function PilotRangeProfile({
                 </>
               )}
 
-              <text x={valueX} y={mid} dy="3" textAnchor="end" fill={INK} fontSize="9" fontWeight="700">
-                {axis.pilotAvg !== null ? formatMetric(axis.pilotAvg, axis.key, true) : "—"}
-              </text>
+              {pilot2X !== null && (
+                <circle cx={pilot2X} cy={mid + lane} r={dotRadius} fill={secondaryColor} stroke="white" strokeWidth="2" />
+              )}
+
+              {split ? (
+                <>
+                  <text x={valueX} y={mid - textLane} dy="3" textAnchor="end" fill={primaryColor} fontSize="8.5" fontWeight="700">
+                    {axis.pilotAvg !== null ? formatMetric(axis.pilotAvg, axis.key, true) : "—"}
+                  </text>
+                  <text x={valueX} y={mid + textLane} dy="3" textAnchor="end" fill={secondaryColor} fontSize="8.5" fontWeight="700">
+                    {axis.pilot2Avg !== null && axis.pilot2Avg !== undefined ? formatMetric(axis.pilot2Avg, axis.key, true) : "—"}
+                  </text>
+                </>
+              ) : (
+                <text x={valueX} y={mid} dy="3" textAnchor="end" fill={INK} fontSize="9" fontWeight="700">
+                  {axis.pilotAvg !== null ? formatMetric(axis.pilotAvg, axis.key, true) : "—"}
+                </text>
+              )}
             </g>
-          ))}
+            );
+          })}
         </svg>
       </div>
     </div>
@@ -613,40 +677,67 @@ export function PilotRangeProfile({
 }
 
 // Легенда профиля теми же фигурами, что и на графике, — для PDF.
-export function pilotProfileLegendSvg() {
+export function pilotProfileLegendSvg({
+  pilotColor = RED,
+  primaryLabel,
+  secondaryColor = GREEN,
+  secondaryLabel,
+}: {
+  pilotColor?: string;
+  primaryLabel?: string;
+  secondaryColor?: string;
+  secondaryLabel?: string;
+} = {}) {
   const width = PROFILE_WIDTH;
   const height = 16;
   const mid = height / 2;
-  const step = width / 4;
+  const rangeMark = (color: string) => (x: number) => `<rect x="${x}" y="${mid - 4}" width="18" height="8" rx="4" fill="${color}" fill-opacity="0.32"/>`;
+  const avgMark = (color: string) => (x: number) => `<circle cx="${x + 7}" cy="${mid}" r="4" fill="${color}" stroke="#ffffff" stroke-width="2"/>`;
   const items: Array<{ label: string; mark: (x: number) => string }> = [
     { label: "Диапазон типа ВС", mark: (x) => `<rect x="${x}" y="${mid - 5}" width="18" height="10" rx="5" fill="${PROFILE_TRACK_FILL}"/>` },
-    { label: "Диапазон пилота", mark: (x) => `<rect x="${x}" y="${mid - 4}" width="18" height="8" rx="4" fill="${RED}" fill-opacity="0.32"/>` },
-    { label: "Среднее пилота", mark: (x) => `<circle cx="${x + 7}" cy="${mid}" r="4" fill="${RED}" stroke="#ffffff" stroke-width="2"/>` },
+    { label: `Диапазон ${primaryLabel ?? "пилота"}`, mark: rangeMark(pilotColor) },
+    { label: `Среднее ${primaryLabel ?? "пилота"}`, mark: avgMark(pilotColor) },
+    ...(secondaryLabel ? [
+      { label: `Диапазон ${secondaryLabel}`, mark: rangeMark(secondaryColor) },
+      { label: `Среднее ${secondaryLabel}`, mark: avgMark(secondaryColor) },
+    ] : []),
     { label: "Среднее по типу ВС", mark: (x) => `<rect x="${x + 5}" y="${mid - 6}" width="2" height="12" rx="1" fill="${NAVY}"/>` },
   ];
+  const step = width / items.length;
   const content = items.map((item, index) => {
     const x = index * step;
-    return `${item.mark(x)}<text x="${x + 24}" y="${mid + 3}" fill="${MUTED}" font-size="8.5" font-weight="700">${escapeXml(item.label)}</text>`;
+    return `${item.mark(x)}<text x="${x + 24}" y="${mid + 3}" fill="${MUTED}" font-size="8" font-weight="700">${escapeXml(item.label)}</text>`;
   }).join("");
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Легенда профиля"><rect width="${width}" height="${height}" fill="#ffffff"/>${content}</svg>`;
 }
 
 // Тот же профиль строкой SVG — для вставки в PDF-досье.
-export function pilotProfileSvg(axes: PilotProfileAxis[], selectedMetric: FlightMetricKey) {
+export function pilotProfileSvg(axes: PilotProfileAxis[], selectedMetric: FlightMetricKey, pilotColor: string = RED, secondColor: string = GREEN) {
   const { rows, height, valueX } = layoutPilotProfile(axes, selectedMetric);
   if (!rows.length) return "";
 
-  const marks = rows.map(({ axis, top, rowHeight, mid, selected, trackFrom, trackWidth, bandFrom, bandWidth, pilotX, typeX }) => {
+  const marks = rows.map(({ axis, top, rowHeight, mid, selected, trackFrom, trackWidth, bandFrom, bandWidth, pilotX, band2From, band2Width, pilot2X, typeX }) => {
+    // Разметка один в один как на экране: при двух ролях строка делится на две дорожки.
+    const split = pilot2X !== null || band2From !== null;
+    const lane = split ? 3 : 0;
+    const bandHeight = split ? 5 : PROFILE_BAND_H;
+    const dotRadius = split ? 3.6 : 4;
+    const textLane = split ? 5.5 : 0;
     const highlight = selected ? `<rect x="0" y="${top + 1}" width="${PROFILE_WIDTH}" height="${rowHeight - 2}" rx="8" fill="#fdeef0"/>` : "";
     const label = `<text x="${PROFILE_LABEL_W - 12}" y="${mid + 3}" text-anchor="end" fill="${selected ? RED : INK}" font-size="${selected ? 10 : 9}" font-weight="${selected ? 800 : 600}">${escapeXml(axis.label)}</text>`;
     const track = `<rect x="${trackFrom}" y="${mid - PROFILE_TRACK_H / 2}" width="${trackWidth}" height="${PROFILE_TRACK_H}" rx="${PROFILE_TRACK_H / 2}" fill="${PROFILE_TRACK_FILL}"/>`;
-    const band = bandFrom === null ? "" : `<rect x="${bandFrom}" y="${mid - PROFILE_BAND_H / 2}" width="${bandWidth}" height="${PROFILE_BAND_H}" rx="${PROFILE_BAND_H / 2}" fill="${RED}" fill-opacity="0.32"/>`;
+    const band = bandFrom === null ? "" : `<rect x="${bandFrom}" y="${mid - lane - bandHeight / 2}" width="${bandWidth}" height="${bandHeight}" rx="${bandHeight / 2}" fill="${pilotColor}" fill-opacity="0.32"/>`;
+    const band2 = band2From === null ? "" : `<rect x="${band2From}" y="${mid + lane - bandHeight / 2}" width="${band2Width}" height="${bandHeight}" rx="${bandHeight / 2}" fill="${secondColor}" fill-opacity="0.3"/>`;
     const plane = typeX !== null && selected ? `<g transform="translate(${typeX - PROFILE_ICON / 2}, ${mid - PROFILE_TRACK_H / 2 - PROFILE_ICON_GAP - PROFILE_ICON}) scale(${PROFILE_ICON / 24})" fill="${NAVY}"><path d="${PLANE_PATH}"/></g>` : "";
     const typeMark = typeX === null ? "" : `<rect x="${typeX - 3}" y="${mid - 9}" width="6" height="18" rx="3" fill="#ffffff"/><rect x="${typeX - 1}" y="${mid - 7.5}" width="2" height="15" rx="1" fill="${NAVY}"/>`;
-    const pilotMark = pilotX === null ? "" : `<circle cx="${pilotX}" cy="${mid}" r="4" fill="${RED}" stroke="#ffffff" stroke-width="2"/>`;
-    const person = pilotX !== null && selected ? `<g transform="translate(${pilotX - PROFILE_ICON / 2}, ${mid + PROFILE_TRACK_H / 2 + PROFILE_ICON_GAP}) scale(${PROFILE_ICON / 24})" fill="${RED}"><path d="${PILOT_HEAD_PATH}"/><path d="${PILOT_BODY_PATH}"/></g>` : "";
-    const value = `<text x="${valueX}" y="${mid + 3}" text-anchor="end" fill="${INK}" font-size="9" font-weight="700">${escapeXml(axis.pilotAvg !== null ? formatMetric(axis.pilotAvg, axis.key, true) : "—")}</text>`;
-    return `${highlight}${label}${track}${band}${plane}${typeMark}${pilotMark}${person}${value}`;
+    const pilotMark = pilotX === null ? "" : `<circle cx="${pilotX}" cy="${mid - lane}" r="${dotRadius}" fill="${pilotColor}" stroke="#ffffff" stroke-width="2"/>`;
+    const pilot2Mark = pilot2X === null ? "" : `<circle cx="${pilot2X}" cy="${mid + lane}" r="${dotRadius}" fill="${secondColor}" stroke="#ffffff" stroke-width="2"/>`;
+    const person = pilotX !== null && selected && !split ? `<g transform="translate(${pilotX - PROFILE_ICON / 2}, ${mid + PROFILE_TRACK_H / 2 + PROFILE_ICON_GAP}) scale(${PROFILE_ICON / 24})" fill="${pilotColor}"><path d="${PILOT_HEAD_PATH}"/><path d="${PILOT_BODY_PATH}"/></g>` : "";
+    const value = split
+      ? `<text x="${valueX}" y="${mid - textLane + 3}" text-anchor="end" fill="${pilotColor}" font-size="8.5" font-weight="700">${escapeXml(axis.pilotAvg !== null ? formatMetric(axis.pilotAvg, axis.key, true) : "—")}</text>`
+        + `<text x="${valueX}" y="${mid + textLane + 3}" text-anchor="end" fill="${secondColor}" font-size="8.5" font-weight="700">${escapeXml(axis.pilot2Avg !== null && axis.pilot2Avg !== undefined ? formatMetric(axis.pilot2Avg, axis.key, true) : "—")}</text>`
+      : `<text x="${valueX}" y="${mid + 3}" text-anchor="end" fill="${INK}" font-size="9" font-weight="700">${escapeXml(axis.pilotAvg !== null ? formatMetric(axis.pilotAvg, axis.key, true) : "—")}</text>`;
+    return `${highlight}${label}${track}${band}${band2}${plane}${typeMark}${pilotMark}${pilot2Mark}${person}${value}`;
   }).join("");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PROFILE_WIDTH} ${height}" width="${PROFILE_WIDTH}" height="${height}" role="img" aria-label="Профиль пилота по всем показателям"><rect width="${PROFILE_WIDTH}" height="${height}" fill="#ffffff"/>${marks}</svg>`;

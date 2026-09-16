@@ -27,6 +27,12 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 .tabs { display:flex; gap:7px; margin-top:25px; overflow-x:auto; }.tabs button { min-height:42px; padding:0 16px; border:1px solid #cbd3d7; border-radius:10px; cursor:pointer; white-space:nowrap; background:white; color:#536574; font-size:10px; font-weight:800; }.tabs button.active { border-color:var(--navy); background:var(--navy); color:white; }
 .table-shell { margin-top:12px; overflow:auto; overscroll-behavior-inline:contain; -webkit-overflow-scrolling:touch; border:1px solid var(--line); border-radius:16px; background:white; box-shadow:0 10px 30px #1027400b; scrollbar-color:#9aabb6 #edf1f3; scrollbar-width:thin; }.table-shell::-webkit-scrollbar { height:10px; }.table-shell::-webkit-scrollbar-track { background:#edf1f3; }.table-shell::-webkit-scrollbar-thumb { border:2px solid #edf1f3; border-radius:999px; background:#9aabb6; } table { width:100%; min-width:1350px; border-collapse:collapse; table-layout:auto; font-size:11px; font-variant-numeric:tabular-nums; } th,td { padding:14px 12px; border-bottom:1px solid #e5e9ea; text-align:right; white-space:nowrap; } thead th { min-width:0; padding:0; background:#f3f6f7; color:#687985; font-size:8px; letter-spacing:.04em; text-transform:uppercase; } table:not(.pilot-table) thead th:nth-child(2) { min-width:112px; } table:not(.pilot-table) thead th:nth-child(3) { min-width:122px; } table:not(.pilot-table) thead th:nth-child(4) { min-width:126px; } table:not(.pilot-table) thead th:nth-child(5) { min-width:160px; } table:not(.pilot-table) thead th:nth-child(6) { min-width:152px; } table:not(.pilot-table) thead th:nth-child(7) { min-width:142px; } table:not(.pilot-table) thead th:nth-child(8) { min-width:126px; } table:not(.pilot-table) thead th:nth-child(9) { min-width:112px; } table:not(.pilot-table) thead th:nth-child(10) { min-width:152px; } th:first-child { position:sticky; left:0; z-index:1; width:1%; min-width:0; background:white; color:#26435b; text-align:left; } thead th:first-child { z-index:2; background:#f3f6f7; } thead th small,.pilot-table th small { display:block; margin-top:3px; color:#99a5ad; font-size:8px; } tbody tr:hover td,tbody tr:hover th { background:#f9fbfb; }.pilot-table { min-width:1180px; }.pilot-table thead th { min-width:118px; }.pilot-table thead th:first-child { min-width:0; }.delta { color:var(--navy); font-weight:800; }
 .sort-help { margin:10px 2px 0; color:#74818a; font-size:10px; line-height:1.45; }.mobile-table-hint { display:none; }.sort-label { display:grid; width:100%; min-height:70px; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:7px; padding:8px 9px; background:transparent; color:inherit; text-align:right; transition:background .15s ease,color .15s ease; }.sort-label.active { background:#e8eef1; color:var(--navy); }.sort-label label { display:flex; min-height:50px; align-items:center; justify-content:flex-end; gap:8px; cursor:pointer; }.sort-label label>span { display:block; min-width:0; white-space:normal; overflow-wrap:anywhere; line-height:1.3; }.sort-label input { appearance:none; display:grid; width:17px; height:17px; margin:0; flex:0 0 auto; place-items:center; border:1px solid #aebbc4; border-radius:5px; cursor:pointer; background:white; transition:border-color .15s ease,background-color .15s ease,box-shadow .15s ease; }.sort-label input::after { content:""; width:8px; height:5px; border-left:2px solid white; border-bottom:2px solid white; opacity:0; transform:translateY(-1px) rotate(-45deg); }.sort-label input:hover { border-color:var(--navy); }.sort-label input:focus-visible { outline:none; box-shadow:0 0 0 3px #1839641f; }.sort-label input:checked { border-color:var(--red); background:var(--red); }.sort-label input:checked::after { opacity:1; }.sort-priority { display:grid; width:20px; height:20px; place-items:center; border-radius:7px; background:var(--navy); color:white; font-size:8px; font-weight:900; }.sort-arrow { display:grid; width:28px; height:28px; padding:0; place-items:center; border:1px solid #c8d2d8; border-radius:8px; cursor:pointer; background:white; color:var(--red); font-size:12px; font-weight:900; transition:border-color .15s ease,background .15s ease,color .15s ease; }.sort-arrow:hover:not(:disabled) { border-color:var(--navy); background:var(--navy); color:white; }.sort-arrow:disabled { cursor:default; opacity:.3; }.table-shell thead th:first-child .sort-label { text-align:left; }.table-shell thead th:first-child .sort-label label { justify-content:flex-start; }
+
+/* Заголовки столбцов не переносим: колонка подстраивается под ширину заголовка. Иначе
+   «Среднее пилота» ломается по слогам, а «Тип ВС» в первом столбце — по одной букве. */
+.sort-label { min-height: 56px; grid-template-columns: minmax(max-content, 1fr) auto auto; }
+.sort-label label { min-height: 40px; }
+.sort-label label > span { min-width: max-content; white-space: nowrap; overflow-wrap: normal; }
 .pilot-controls { grid-template-columns:minmax(240px,1.15fr) minmax(240px,1fr) minmax(145px,.38fr); margin-top:12px; }.note,.method { margin:11px 2px 0; color:#74818a; font-size:10px; line-height:1.55; }.method { margin-top:14px; }
 .stats-controls { grid-template-columns:minmax(160px,.7fr) minmax(190px,.85fr) minmax(250px,1.3fr) minmax(140px,.42fr); }
 .comparison-picker { margin-top:14px; padding:20px 22px; border:1px solid #ccd7de; border-radius:18px; background:linear-gradient(135deg,#fff 0%,#f6f9fb 100%); box-shadow:0 12px 32px #1027400b; }
@@ -66,7 +72,7 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 
 .pilot-card-role { background: var(--navy); color: white; }
 
-.pilot-card-role.is-second { background: #e3eaf3; color: var(--navy); }
+.pilot-card-role.is-second { background: #e6f3ee; color: #14684a; }
 
 .pilot-card-code, .pilot-card-position { background: #eef2f5; color: #55636f; }
 
@@ -90,15 +96,25 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 
 .pilot-card-report-error { margin: 10px 28px 0; color: #a51428; font-size: 11px; font-weight: 700; }
 
-.pilot-card-tabs { display: flex; gap: 7px; padding: 16px 28px 0; }
+.pilot-card-tabbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; padding: 16px 28px 14px; border-bottom: 1px solid #e5e9ea; }
 
-.pilot-card-seat-tabs { display: flex; gap: 7px; align-items: center; padding: 16px 28px 0; }
+.pilot-card-tabs { display: flex; gap: 7px; }
 
-.pilot-card-seat-tabs-label { font-size: 11px; font-weight: 800; color: #7c8894; margin-right: 2px; }
+.pilot-card-tabs button { min-height: 38px; padding: 0 16px; border: 1px solid #c7d1d8; border-radius: 10px; cursor: pointer; white-space: nowrap; background: #f9fbfc; color: #536574; font-size: 11px; font-weight: 800; }
 
-.pilot-card-tabs button, .pilot-card-seat-tabs button { min-height: 38px; padding: 0 16px; border: 1px solid #c7d1d8; border-radius: 10px; cursor: pointer; white-space: nowrap; background: #f9fbfc; color: #536574; font-size: 11px; font-weight: 800; }
+.pilot-card-tabs button.active { border-color: var(--navy); background: var(--navy); color: white; }
 
-.pilot-card-tabs button.active, .pilot-card-seat-tabs button.active { border-color: var(--navy); background: var(--navy); color: white; }
+.pilot-card-seat-filter { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 12px; border: 1px solid #dbe3e9; border-radius: 12px; background: #f1f5f8; }
+
+.pilot-card-seat-filter-label { color: #7c8894; font-size: 9px; font-weight: 900; letter-spacing: 0.07em; text-transform: uppercase; }
+
+.pilot-card-seat-filter button { min-height: 30px; padding: 0 12px; border: 1px solid #cfd8de; border-radius: 8px; cursor: pointer; white-space: nowrap; background: white; color: #6a7681; font-size: 10px; font-weight: 800; font-variant-numeric: tabular-nums; transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease; }
+
+.pilot-card-seat-filter button:hover { border-color: #9dabb5; }
+
+.pilot-card-seat-filter button.active { border-color: var(--red); background: var(--red); color: white; }
+
+.pilot-card-seat-filter button.active.is-second { border-color: var(--green); background: var(--green); }
 
 .pilot-card-flights-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
@@ -129,13 +145,23 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 
 .profile-legend-type-avg { width: 3px; height: 14px; border-radius: 2px; background: var(--navy); }
 
+.profile-legend-pilot2-range { width: 18px; height: 7px; border-radius: 99px; background: #19805b4d; }
+
+.profile-legend-pilot2-avg { width: 10px; height: 10px; border: 2px solid #fff; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 1px var(--green); }
+
 .pilot-stats-table-shell { overflow-x: auto; border: 1px solid #d7dde1; border-radius: 14px; background: white; box-shadow: 0 8px 20px rgba(16, 39, 64, 0.06); }
 
 .pilot-stats-table { width: 100%; min-width: 660px; table-layout: fixed; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
 
+/* При двух выбранных ролях в каждой ячейке два значения через дробь — колонкам нужен запас, иначе текст налезает. */
+.pilot-stats-table.is-split { min-width: 1060px; }
+
 .pilot-stats-table thead th { padding: 6px 8px; background: #f3f6f7; color: #687985; font-size: 9px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; text-align: right; white-space: nowrap; }
 
 .pilot-stats-table thead th.group-pilot { background: #fdf1f3; color: #a8182b; }
+
+/* Когда показывается только CM2, вся «пилотская» половина таблицы зелёная — как и его метки на графике. */
+.pilot-stats-table.is-second-seat thead th.group-pilot { background: #e9f4ef; color: #14684a; }
 
 .pilot-stats-table thead th.group-type { background: #edf2fa; color: var(--navy); }
 

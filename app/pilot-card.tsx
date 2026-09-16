@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatFlightDate, formatMetric, metricDefinitions, normalizeFlightDate, worstEventColor, summarizeEventColors, type Flight, type FlightMetricKey, type PilotRow } from "./flight-data";
-import { PilotRangeProfile, type PilotProfileAxis } from "./histogram";
+import { formatFlightDate, formatMetric, metricDefinitions, normalizeFlightDate, worstEventColor, summarizeEventColors, type Flight, type FlightMetricKey, type PilotRow, type PilotSummary } from "./flight-data";
+import { PilotRangeProfile, SEAT_COLORS, type PilotProfileAxis } from "./histogram";
 import { COLOR_LABELS, COLOR_STYLES } from "./events-analytics";
 import { FlightDetailCard } from "./flight-detail-card";
 import { downloadPilotReportPdf } from "./report-export";
@@ -11,21 +11,31 @@ interface PilotCardProps {
   pilotRow: PilotRow;
   flights: Flight[];
   onClose: () => void;
-  aircraftFilter?: string;
-  airportFilter?: string;
 }
 
-type FlightSortKey = "date" | "flightNumber" | "route" | "departureTime" | "arrivalTime" | "board" | FlightMetricKey;
+type FlightSortKey = "date" | "flightNumber" | "route" | "departureTime" | "arrivalTime" | "board" | "role" | FlightMetricKey;
 type SortDirection = "asc" | "desc";
 
 type PilotCardTab = "stats" | "flights";
 
-export function PilotCard({ pilotRow, flights, onClose, aircraftFilter = "", airportFilter = "" }: PilotCardProps) {
-  // Компонент монтируется заново при смене pilotRow (см. key в page.tsx), поэтому activeSeat
+export function PilotCard({ pilotRow, flights, onClose }: PilotCardProps) {
+  // Компонент монтируется заново при смене pilotRow (см. key в page.tsx), поэтому выбор ролей
   // корректно сбрасывается на дефолт без эффекта.
   const availableSeats = (["CM1", "CM2"] as const).filter((seat) => pilotRow.summaries[seat]);
-  const [activeSeat, setActiveSeat] = useState<"CM1" | "CM2">(() => (pilotRow.summaries.CM1 ? "CM1" : "CM2"));
-  const pilot = pilotRow.summaries[activeSeat] ?? pilotRow.summaries[availableSeats[0]]!;
+  const [pickedSeats, setPickedSeats] = useState<Array<"CM1" | "CM2">>(() => [...availableSeats]);
+  // Порядок ролей всегда CM1 → CM2, чтобы значения «через дробь» читались одинаково везде.
+  const seats = availableSeats.filter((seat) => pickedSeats.includes(seat));
+  const toggleSeat = (seat: "CM1" | "CM2") => setPickedSeats((current) => (
+    current.includes(seat)
+      ? (current.length > 1 ? current.filter((item) => item !== seat) : current)
+      : [...current, seat]
+  ));
+  const summaries = seats.map((seat) => pilotRow.summaries[seat]!);
+  const pilot = summaries[0];
+  const secondary = summaries[1];
+  // При двух выбранных ролях значение показывается через дробь, как в списке пилотов.
+  const bySeat = (pick: (summary: PilotSummary) => string) => summaries.map(pick).join(" / ");
+  const seatOfFlight = (flight: Flight) => flight.crew.find((member) => member.code === pilotRow.code)?.role ?? "—";
   const [reportPending, setReportPending] = useState(false);
   const [reportError, setReportError] = useState("");
   const [tab, setTab] = useState<PilotCardTab>("stats");
@@ -36,15 +46,18 @@ export function PilotCard({ pilotRow, flights, onClose, aircraftFilter = "", air
   const [dateTo, setDateTo] = useState("");
   const [flightSort, setFlightSort] = useState<{ key: FlightSortKey; direction: SortDirection }>({ key: "date", direction: "desc" });
 
-  const pilotFlights = useMemo(() => 
-    flights.filter((flight) => 
-      flight.crew.some((member) => member.code === pilot.code && member.role === pilot.role && flight.aircraftType === pilot.aircraftType)
-    ), [flights, pilot]
-  );
+  const seatKey = seats.join("+");
+  const pilotFlights = useMemo(() => {
+    const picked = seatKey.split("+");
+    return flights.filter((flight) =>
+      flight.aircraftType === pilotRow.aircraftType &&
+      flight.crew.some((member) => member.code === pilotRow.code && picked.includes(member.role))
+    );
+  }, [flights, pilotRow.aircraftType, pilotRow.code, seatKey]);
 
   const dateRange = useMemo(() => {
     const dates = pilotFlights.map((flight) => normalizeFlightDate(flight.date)).filter((date): date is string => Boolean(date));
-    if (dates.length === 0) return { min: "", max: "", displayMin: "", displayMax: "" };
+    if (dates.length === 0) return { min: "", max: "", displayMin: "", displayMax: "", firstFlight: null, lastFlight: null };
     const sorted = [...dates].sort();
     const [firstYear, firstMonth] = sorted[0].split("-").map(Number);
     const [lastYear, lastMonth] = sorted[sorted.length - 1].split("-").map(Number);
@@ -56,6 +69,10 @@ export function PilotCard({ pilotRow, flights, onClose, aircraftFilter = "", air
       max,
       displayMin: formatFlightDate(min),
       displayMax: formatFlightDate(max),
+      // Границы выше выровнены по месяцам — это диапазон для полей фильтра.
+      // В отчёт идут фактические даты первого и последнего рейса.
+      firstFlight: sorted[0],
+      lastFlight: sorted[sorted.length - 1],
     };
   }, [pilotFlights]);
 
@@ -92,6 +109,7 @@ export function PilotCard({ pilotRow, flights, onClose, aircraftFilter = "", air
         if (key === "departureTime") return flight.departureTime || "";
         if (key === "arrivalTime") return flight.arrivalTime || "";
         if (key === "board") return flight.board || "";
+        if (key === "role") return flight.crew.find((member) => member.code === pilotRow.code)?.role ?? "";
         return flight.metrics[key as FlightMetricKey];
       };
 
@@ -107,7 +125,7 @@ export function PilotCard({ pilotRow, flights, onClose, aircraftFilter = "", air
       
       return flightSort.direction === "asc" ? comparison : -comparison;
     });
-  }, [filteredFlights, flightSort]);
+  }, [filteredFlights, flightSort, pilotRow.code]);
 
   const formatDate = (dateStr: string) => {
     return formatFlightDate(dateStr);
@@ -127,20 +145,29 @@ export function PilotCard({ pilotRow, flights, onClose, aircraftFilter = "", air
     }));
   };
 
-  const profileAxes = useMemo<PilotProfileAxis[]>(() => metricDefinitions.map((item) => ({
-    key: item.key,
-    label: item.shortLabel,
-    unit: item.unit,
-    digits: item.digits,
-    pilotMin: pilot.minMetrics[item.key],
-    pilotMax: pilot.maxMetrics[item.key],
-    pilotAvg: pilot.metrics[item.key],
-    typeAvg: pilot.typeMetrics[item.key],
-    typeMin: pilot.typeMinMetrics[item.key],
-    typeMax: pilot.typeMaxMetrics[item.key],
-  })), [pilot]);
+  const profileAxes = useMemo<PilotProfileAxis[]>(() => {
+    const picked = seatKey.split("+") as Array<"CM1" | "CM2">;
+    const first = pilotRow.summaries[picked[0]]!;
+    const second = picked[1] ? pilotRow.summaries[picked[1]] : undefined;
+    return metricDefinitions.map((item) => ({
+      key: item.key,
+      label: item.shortLabel,
+      unit: item.unit,
+      digits: item.digits,
+      pilotMin: first.minMetrics[item.key],
+      pilotMax: first.maxMetrics[item.key],
+      pilotAvg: first.metrics[item.key],
+      typeAvg: first.typeMetrics[item.key],
+      typeMin: first.typeMinMetrics[item.key],
+      typeMax: first.typeMaxMetrics[item.key],
+      pilot2Min: second?.minMetrics[item.key] ?? null,
+      pilot2Max: second?.maxMetrics[item.key] ?? null,
+      pilot2Avg: second?.metrics[item.key] ?? null,
+    }));
+  }, [pilotRow, seatKey]);
 
-  const avatarSrc = pilot.role === "CM1" ? "/pilot.png" : "/co-pilot.png";
+  // Аватар — по должности человека, а не по креслу: должность одна на обе роли.
+  const avatarSrc = pilotRow.position === "КВС" ? "/pilot.png" : "/co-pilot.png";
 
   const handleReport = async () => {
     setReportPending(true);
@@ -158,11 +185,11 @@ export function PilotCard({ pilotRow, flights, onClose, aircraftFilter = "", air
       await downloadPilotReportPdf({
         generatedAt: new Date(),
         pilot,
+        secondary,
         profileAxes,
         selectedMetric,
-        flightsInScope: pilotFlights.length,
-        aircraftFilter,
-        airportFilter,
+        periodFrom: dateRange.firstFlight,
+        periodTo: dateRange.lastFlight,
         avatarDataUrl,
       });
     } catch (error) {
@@ -185,12 +212,14 @@ export function PilotCard({ pilotRow, flights, onClose, aircraftFilter = "", air
               <img src={avatarSrc} alt="" width="192" height="192" />
             </span>
             <div className="pilot-card-identity-text">
-              <h2 id="pilot-card-title">{pilot.name}</h2>
+              <h2 id="pilot-card-title">{pilotRow.name}</h2>
               <div className="pilot-card-meta">
-                <span className={`pilot-card-role${pilot.role === "CM1" ? "" : " is-second"}`}>{pilot.role}</span>
-                <span className="pilot-card-position">{pilot.position}</span>
-                <span className="pilot-card-code">Табельный № {pilot.code}</span>
-                <span className="pilot-card-aircraft">{pilot.aircraftType}</span>
+                <span className="pilot-card-position">{pilotRow.position}</span>
+                {availableSeats.length === 1 && (
+                  <span className={`pilot-card-role${availableSeats[0] === "CM1" ? "" : " is-second"}`}>{availableSeats[0]}</span>
+                )}
+                <span className="pilot-card-code">Табельный № {pilotRow.code}</span>
+                <span className="pilot-card-aircraft">{pilotRow.aircraftType}</span>
                 <span className="pilot-card-count">{pilotFlights.length} рейсов в выборке</span>
               </div>
             </div>
@@ -206,20 +235,27 @@ export function PilotCard({ pilotRow, flights, onClose, aircraftFilter = "", air
 
         {reportError && <p className="pilot-card-report-error" role="alert">{reportError}</p>}
 
-        {availableSeats.length > 1 && (
-          <div className="pilot-card-seat-tabs">
-            <span className="pilot-card-seat-tabs-label">Кресло:</span>
-            {availableSeats.map((seat) => (
-              <button key={seat} type="button" className={activeSeat === seat ? "active" : ""} onClick={() => setActiveSeat(seat)}>
-                {seat} · {pilotRow.summaries[seat]!.flights} рейс.
-              </button>
-            ))}
+        <div className="pilot-card-tabbar">
+          <div className="pilot-card-tabs">
+            <button type="button" className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}>Статистика</button>
+            <button type="button" className={tab === "flights" ? "active" : ""} onClick={() => setTab("flights")}>Рейсы пилота ({pilotFlights.length})</button>
           </div>
-        )}
-
-        <div className="pilot-card-tabs">
-          <button type="button" className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}>Статистика</button>
-          <button type="button" className={tab === "flights" ? "active" : ""} onClick={() => setTab("flights")}>Рейсы пилота ({pilotFlights.length})</button>
+          {availableSeats.length > 1 && (
+            <div className="pilot-card-seat-filter" role="group" aria-label="Роль в экипаже">
+              <span className="pilot-card-seat-filter-label">Роль</span>
+              {availableSeats.map((seat) => (
+                <button
+                  key={seat}
+                  type="button"
+                  className={`${seats.includes(seat) ? "active" : ""}${seat === "CM2" ? " is-second" : ""}`}
+                  aria-pressed={seats.includes(seat)}
+                  onClick={() => toggleSeat(seat)}
+                >
+                  {seat} · {pilotRow.summaries[seat]!.flights}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Statistics Summary */}
@@ -227,7 +263,7 @@ export function PilotCard({ pilotRow, flights, onClose, aircraftFilter = "", air
           <div className="pilot-card-stats-header">
             <div>
               <span>Сводная статистика</span>
-              <strong>Пилот в сравнении с типом ВС</strong>
+              <strong>{seats.join(" / ")} в сравнении с типом ВС</strong>
             </div>
             <select 
               value={selectedMetric} 
@@ -242,12 +278,12 @@ export function PilotCard({ pilotRow, flights, onClose, aircraftFilter = "", air
           </div>
           
           <div className="pilot-stats-table-shell">
-            <table className="pilot-stats-table">
+            <table className={`pilot-stats-table${secondary ? " is-split" : ""}${seats[0] === "CM2" ? " is-second-seat" : ""}`}>
               <thead>
                 <tr>
                   <th rowSpan={2} className="pilot-stats-metric-head">Показатель</th>
                   <th colSpan={4} className="group-pilot">Пилот</th>
-                  <th colSpan={3} className="group-type col-sep">Тип ВС · {pilot.aircraftType}</th>
+                  <th colSpan={3} className="group-type col-sep">Тип ВС · {pilotRow.aircraftType}</th>
                   <th rowSpan={2} className="col-sep">Разница</th>
                 </tr>
                 <tr>
@@ -262,9 +298,7 @@ export function PilotCard({ pilotRow, flights, onClose, aircraftFilter = "", air
               </thead>
               <tbody>
                 {metricDefinitions.map((item) => {
-                  const own = pilot.metrics[item.key];
                   const baseline = pilot.typeMetrics[item.key];
-                  const rowDelta = own !== null && baseline !== null ? own - baseline : null;
                   const isSelected = item.key === selectedMetric;
                   return (
                     <tr
@@ -273,15 +307,19 @@ export function PilotCard({ pilotRow, flights, onClose, aircraftFilter = "", air
                       onClick={() => setSelectedMetric(item.key)}
                     >
                       <th scope="row">{item.label}{item.unit && <small>, {item.unit}</small>}</th>
-                      <td>{formatMetric(pilot.minMetrics[item.key], item.key)}</td>
-                      <td className="is-mean">{formatMetric(own, item.key)}</td>
-                      <td>{formatMetric(pilot.maxMetrics[item.key], item.key)}</td>
-                      <td>{formatMetric(pilot.medianMetrics[item.key], item.key)}</td>
+                      <td>{bySeat((summary) => formatMetric(summary.minMetrics[item.key], item.key))}</td>
+                      <td className="is-mean">{bySeat((summary) => formatMetric(summary.metrics[item.key], item.key))}</td>
+                      <td>{bySeat((summary) => formatMetric(summary.maxMetrics[item.key], item.key))}</td>
+                      <td>{bySeat((summary) => formatMetric(summary.medianMetrics[item.key], item.key))}</td>
                       <td className="col-sep">{formatMetric(pilot.typeMinMetrics[item.key], item.key)}</td>
                       <td className="is-mean">{formatMetric(baseline, item.key)}</td>
                       <td>{formatMetric(pilot.typeMaxMetrics[item.key], item.key)}</td>
                       <td className="col-sep is-delta">
-                        {rowDelta === null ? "—" : `${rowDelta > 0 ? "+" : ""}${formatMetric(rowDelta, item.key)}`}
+                        {bySeat((summary) => {
+                          const value = summary.metrics[item.key];
+                          const delta = value !== null && baseline !== null ? value - baseline : null;
+                          return delta === null ? "—" : `${delta > 0 ? "+" : ""}${formatMetric(delta, item.key)}`;
+                        })}
                       </td>
                     </tr>
                   );
@@ -295,13 +333,15 @@ export function PilotCard({ pilotRow, flights, onClose, aircraftFilter = "", air
               <div><span>Все показатели</span><h2>Профиль пилота</h2></div>
               <ul className="chart-legend">
                 <li><i className="profile-legend-type-range" />Диапазон типа ВС</li>
-                <li><i className="profile-legend-pilot-range" />Диапазон пилота</li>
-                <li><i className="profile-legend-pilot-avg" />Среднее пилота</li>
+                <li><i className={seats[0] === "CM2" ? "profile-legend-pilot2-range" : "profile-legend-pilot-range"} />Диапазон {secondary ? seats[0] : "пилота"}</li>
+                <li><i className={seats[0] === "CM2" ? "profile-legend-pilot2-avg" : "profile-legend-pilot-avg"} />Среднее {secondary ? seats[0] : "пилота"}</li>
+                {secondary && <li><i className="profile-legend-pilot2-range" />Диапазон {seats[1]}</li>}
+                {secondary && <li><i className="profile-legend-pilot2-avg" />Среднее {seats[1]}</li>}
                 <li><i className="profile-legend-type-avg" />Среднее по типу ВС</li>
               </ul>
             </div>
             <p className="note">Голубая дорожка — диапазон по типу ВС, одинаковый по длине во всех строках. Внутри неё видно, какую часть этого диапазона занимает пилот. Точные значения есть в таблице выше и при наведении на строку.</p>
-            <PilotRangeProfile axes={profileAxes} selectedMetric={selectedMetric} pilotLabel={pilot.name} baselineLabel="тип ВС" />
+            <PilotRangeProfile axes={profileAxes} selectedMetric={selectedMetric} pilotLabel={pilotRow.name} baselineLabel="тип ВС" primaryLabel={seats[0]} secondaryLabel={seats[1]} primaryColor={SEAT_COLORS[seats[0]]} secondaryColor={SEAT_COLORS[seats[1] ?? "CM2"]} />
           </article>
         </div>}
 
@@ -380,6 +420,9 @@ export function PilotCard({ pilotRow, flights, onClose, aircraftFilter = "", air
                     <th onClick={() => handleSort("board")} className={flightSort.key === "board" ? "active" : ""}>
                       Борт {flightSort.key === "board" && (flightSort.direction === "asc" ? "↑" : "↓")}
                     </th>
+                    <th onClick={() => handleSort("role")} className={flightSort.key === "role" ? "active" : ""}>
+                      Роль {flightSort.key === "role" && (flightSort.direction === "asc" ? "↑" : "↓")}
+                    </th>
                     <th>События</th>
                     {metricDefinitions.map((metric) => (
                       <th 
@@ -410,6 +453,7 @@ export function PilotCard({ pilotRow, flights, onClose, aircraftFilter = "", air
                       <td>{formatTime(flight.departureTime)}</td>
                       <td>{formatTime(flight.arrivalTime)}</td>
                       <td>{flight.board || "—"}</td>
+                      <td>{seatOfFlight(flight)}</td>
                       <td>
                         {eventColor ? (
                           <span
