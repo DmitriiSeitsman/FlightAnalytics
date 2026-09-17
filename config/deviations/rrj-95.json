@@ -1,0 +1,290 @@
+{
+  "$schema": "./schema.json",
+  "document": {
+    "id": "И-04.02-28-24",
+    "edition": "06",
+    "change": "01",
+    "effectiveFrom": "10.10.2024",
+    "appendix": "№ 6"
+  },
+  "aircraft": {
+    "id": "RRJ-95",
+    "aliases": [
+      "RRJ-95B",
+      "RRJ-95LR"
+    ]
+  },
+  "rules": [
+    {
+      "id": "flight-control-check",
+      "name": {
+        "ru": "Проверка органов управления перед взлётом не проводилась или проведена не в полном объёме",
+        "en": "Flight Control Check"
+      },
+      "category": "Procedure",
+      "summaryRow": "отклонение выполнения СОП",
+      "source": {
+        "page": 76,
+        "codes": [
+          "317",
+          "319",
+          "321"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "не проводилась или проведена не в полном объеме",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4,
+        "description": "N/C — проверка не выполнена"
+      }
+    },
+    {
+      "id": "pitch-high-at-touchdown",
+      "name": {
+        "ru": "Большой угол тангажа на посадке",
+        "en": "Pitch High at Touch Down"
+      },
+      "category": "Attitude",
+      "summaryRow": "повышенный тангаж Θ° на посадке",
+      "source": {
+        "page": 77,
+        "codes": [
+          "464"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "угол тангажа",
+        "parameter": "Pitch",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greater",
+        "unit": "°",
+        "levels": {
+          "2": 9,
+          "3": 10,
+          "4": 11
+        }
+      }
+    },
+    {
+      "id": "high-acceleration-at-touchdown",
+      "name": {
+        "ru": "Повышенная вертикальная перегрузка на посадке",
+        "en": "High Acceleration at Touch Down"
+      },
+      "category": "Acceleration",
+      "summaryRow": "повышенная перегрузка при посадке Ny",
+      "source": {
+        "page": 78,
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "вертикальной перегрузкой более",
+        "parameter": "Ny",
+        "use": "max",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greaterOrEqual",
+        "unit": "g",
+        "levels": {
+          "2": 1.76,
+          "3": 1.81,
+          "4": {
+            "value": 2.0,
+            "compare": "greater"
+          }
+        }
+      },
+      "note": "По инструкции 4 уровень — строго более 2.0 g, поэтому знак сравнения у уровня свой."
+    },
+    {
+      "id": "high-vertical-speed-at-touchdown",
+      "name": {
+        "ru": "Повышенная вертикальная скорость на посадке",
+        "en": "High Vertical Speed at Touchdown"
+      },
+      "category": "Acceleration",
+      "summaryRow": "повышенная вертикальная скорость Vy",
+      "source": {
+        "page": 78,
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "вертикальной скоростью",
+        "parameter": "Vy",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greater",
+        "unit": "fpm",
+        "levels": {
+          "2": 420,
+          "3": 460,
+          "4": 510
+        }
+      },
+      "note": "Пороги 3 и 4 уровня изменены Изменением 01 от 10.10.2024."
+    },
+    {
+      "id": "long-touchdown",
+      "name": {
+        "ru": "Перелёт при посадке",
+        "en": "Long Touchdown"
+      },
+      "category": "Other",
+      "summaryRow": "перелёт при посадке",
+      "source": {
+        "page": 79,
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "до касания более",
+        "parameter": "Sdis",
+        "use": "max",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greater",
+        "unit": "м",
+        "levels": {
+          "2": 900,
+          "3": 1000,
+          "4": 1100
+        }
+      }
+    },
+    {
+      "id": "short-touchdown",
+      "name": {
+        "ru": "Недолёт при посадке",
+        "en": "Short Touchdown"
+      },
+      "category": "Other",
+      "summaryRow": "перелёт при посадке",
+      "source": {
+        "page": 79,
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "до касания менее",
+        "parameter": "Sdis",
+        "use": "min",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "less",
+        "unit": "м",
+        "levels": {
+          "2": 200,
+          "3": 150,
+          "4": 100
+        }
+      }
+    },
+    {
+      "id": "excessive-bank-angle-low-alt-30-0",
+      "name": {
+        "ru": "Большой угол крена на заходе, 30–0 ft",
+        "en": "Excessive Bank Angle in Approach (Low ALT) 30-0 ft"
+      },
+      "category": "Attitude",
+      "summaryRow": "крен (Roll) более допустимого",
+      "source": {
+        "page": 78,
+        "codes": [
+          "460",
+          "463"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "крена",
+        "parameter": "Roll",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greaterOrEqual",
+        "unit": "°",
+        "levels": {
+          "2": 7,
+          "3": {
+            "value": 9,
+            "compare": "greater"
+          },
+          "4": {
+            "value": 11,
+            "compare": "greater"
+          }
+        }
+      }
+    },
+    {
+      "id": "reverser-at-low-speed",
+      "name": {
+        "ru": "Использование реверса на малой скорости",
+        "en": "Use of Reverser at Low Speed"
+      },
+      "category": "Configuration",
+      "summaryRow": "отклонение выполнения СОП",
+      "source": {
+        "page": 84,
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "менее 65 knots",
+        "parameter": "Vcom",
+        "use": "min",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 2,
+        "description": "Event — засчитывается сам факт"
+      }
+    },
+    {
+      "id": "engine-reverser-selected-in-flight",
+      "name": {
+        "ru": "Включение реверса тяги в полёте",
+        "en": "Engine reverser selected in flight"
+      },
+      "category": "Warning",
+      "summaryRow": "конфигурация",
+      "source": {
+        "page": 84,
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "реверса тяги в полете",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4,
+        "description": "Event 3s before T/D"
+      }
+    }
+  ]
+}

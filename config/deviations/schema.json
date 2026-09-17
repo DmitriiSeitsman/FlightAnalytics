@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flight-analytics/deviations.schema.json",
+  "title": "Нормативы классификации Отклонений по типу ВС",
+  "description": "Один файл — один тип ВС. Источник: И-04.02-28-24, приложение № 6. Схема нужна для подсказок в редакторе; обязательная проверка выполняется валидатором в app/deviations/config.ts.",
+  "type": "object",
+  "required": [
+    "document",
+    "aircraft",
+    "rules"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "document": {
+      "type": "object",
+      "required": [
+        "id",
+        "edition"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Обозначение документа, например И-04.02-28-24"
+        },
+        "edition": {
+          "type": "string"
+        },
+        "change": {
+          "type": "string"
+        },
+        "effectiveFrom": {
+          "type": "string",
+          "description": "ДД.ММ.ГГГГ"
+        },
+        "appendix": {
+          "type": "string"
+        }
+      }
+    },
+    "aircraft": {
+      "type": "object",
+      "required": [
+        "id",
+        "aliases"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Как тип назван в инструкции: RRJ-95, A319, Б737-800/900"
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "Как тип приходит в выгрузке: RRJ-95B, RRJ-95LR, Airbus 319"
+        }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/rule"
+      }
+    }
+  },
+  "$defs": {
+    "compare": {
+      "enum": [
+        "greater",
+        "greaterOrEqual",
+        "less",
+        "lessOrEqual"
+      ]
+    },
+    "level": {
+      "oneOf": [
+        {
+          "type": "number",
+          "description": "Порог; знак сравнения берётся из compare правила"
+        },
+        {
+          "type": "object",
+          "required": [
+            "value"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "type": "number"
+            },
+            "compare": {
+              "$ref": "#/$defs/compare"
+            }
+          },
+          "description": "Порог со своим знаком сравнения — инструкция смешивает ≥ и >"
+        }
+      ]
+    },
+    "rule": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "category",
+        "match",
+        "trigger"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "name": {
+          "type": "object",
+          "required": [
+            "ru"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "ru": {
+              "type": "string"
+            },
+            "en": {
+              "type": "string"
+            }
+          }
+        },
+        "category": {
+          "enum": [
+            "Speed",
+            "Attitude",
+            "Acceleration",
+            "Configuration",
+            "Warning",
+            "Procedure",
+            "Other"
+          ]
+        },
+        "summaryRow": {
+          "type": "string",
+          "description": "Строка сводной таблицы приложения № 5А"
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "page": {
+              "type": "integer"
+            },
+            "codes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Коды события в Экспресс-Анализе; в выгрузках пока не заполняются"
+            },
+            "origin": {
+              "enum": [
+                "instruction",
+                "company"
+              ]
+            }
+          }
+        },
+        "match": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "kind",
+                "textContains"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "event"
+                },
+                "textContains": {
+                  "type": "string",
+                  "description": "Подстрока текста события, регистр не важен"
+                },
+                "parameter": {
+                  "type": "string",
+                  "description": "Имя параметра события: Ny, Sdis, Vcom"
+                },
+                "use": {
+                  "enum": [
+                    "max",
+                    "min"
+                  ],
+                  "description": "Какое значение параметра брать, по умолчанию max"
+                },
+                "patternVerified": {
+                  "type": "boolean",
+                  "description": "Подтверждён ли текст на реальной выгрузке"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "kind",
+                "metric"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "metric"
+                },
+                "metric": {
+                  "type": "string"
+                }
+              }
+            }
+          ]
+        },
+        "trigger": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "type",
+                "compare",
+                "levels"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "const": "threshold"
+                },
+                "compare": {
+                  "$ref": "#/$defs/compare"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "levels": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "properties": {
+                    "2": {
+                      "$ref": "#/$defs/level"
+                    },
+                    "3": {
+                      "$ref": "#/$defs/level"
+                    },
+                    "4": {
+                      "$ref": "#/$defs/level"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "type",
+                "level"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "const": "occurrence"
+                },
+                "level": {
+                  "enum": [
+                    2,
+                    3,
+                    4
+                  ]
+                },
+                "description": {
+                  "type": "string"
+                }
+              },
+              "description": "Отклонением считается сам факт события"
+            }
+          ]
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "parameter",
+              "compare",
+              "value"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "parameter": {
+                "type": "string"
+              },
+              "compare": {
+                "$ref": "#/$defs/compare"
+              },
+              "value": {
+                "type": "number"
+              },
+              "unit": {
+                "type": "string"
+              }
+            }
+          },
+          "description": "Со-условия: например Ny учитывается только при Vy > 300 fpm"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
