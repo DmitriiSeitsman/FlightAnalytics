@@ -11,8 +11,28 @@ export type DeviationLevel = (typeof deviationLevels)[number];
 export const compareOperators = ["greater", "greaterOrEqual", "less", "lessOrEqual"] as const;
 export type CompareOperator = (typeof compareOperators)[number];
 
-export const deviationCategories = ["Speed", "Attitude", "Acceleration", "Configuration", "Warning", "Procedure", "Other"] as const;
+export const deviationCategories = ["Speed", "Attitude", "Roll", "Acceleration", "VerticalRate", "Alignment", "Configuration", "Warning", "Caution", "Engine", "Procedure", "DualInput", "Other"] as const;
 export type DeviationCategory = (typeof deviationCategories)[number];
+
+// Строки сводной таблицы приложения № 5А, дословно как в инструкции (стр. 38).
+// Правило либо попадает в одну из этих строк, либо не попадает в сводку вовсе (null).
+export const summaryRows = [
+  "повышенная перегрузка при посадке Ny",
+  "повышенный тангаж \u0398\u00b0 на взлёте",
+  "повышенный тангаж \u0398\u00b0 на посадке",
+  "крен (Roll\u00b0) более допустимого",
+  "отклонение по скорости (Vcom, Vgr)",
+  "повышенная вертикальная скорость Vy",
+  "конфигурация",
+  "оповещение",
+  "двойное управление",
+  "повышенные поперечная/продольная перегрузки Nz/Nx",
+  "перелёт при посадке",
+  "отклонение LOC, G/S, G/P",
+  "отклонение выполнения СОП",
+  "интенсивное торможение",
+] as const;
+export type SummaryRow = (typeof summaryRows)[number];
 
 export const compareSigns: Record<CompareOperator, string> = {
   greater: ">",
@@ -34,15 +54,22 @@ export function compareValue(value: number, operator: CompareOperator, threshold
 // внутри одной лестницы (Ny: 1.76 ≥, 1.81 ≥, но 2.0 строго больше).
 export type LevelThreshold = { level: DeviationLevel; value: number; compare: CompareOperator };
 
-export type EventMatch = { kind: "event"; textContains: string; parameter: string | null; use: "max" | "min"; patternVerified: boolean };
+// «abs» — параметр знакопеременный (крен влево, вертикальная скорость вниз),
+// инструкция сравнивает модуль: |ROLL| > 7°.
+export const parameterUses = ["max", "min", "abs"] as const;
+export type ParameterUse = (typeof parameterUses)[number];
+export type EventMatch = { kind: "event"; textContains: string; parameter: string | null; use: ParameterUse; patternVerified: boolean };
 export type MetricMatch = { kind: "metric"; metric: string };
 export type DeviationMatch = EventMatch | MetricMatch;
 
 export type ThresholdTrigger = { type: "threshold"; unit: string | null; ladder: LevelThreshold[] };
 export type OccurrenceTrigger = { type: "occurrence"; level: DeviationLevel; description: string | null };
-export type DeviationTrigger = ThresholdTrigger | OccurrenceTrigger;
+// Уровень определяется не значением параметра, а тем, чего в выгрузке нет
+// (длительность превышения, разница с расчётной скоростью) — только ручная оценка.
+export type ManualTrigger = { type: "manual"; reason: string };
+export type DeviationTrigger = ThresholdTrigger | OccurrenceTrigger | ManualTrigger;
 
-export type DeviationCondition = { parameter: string; compare: CompareOperator; value: number; unit: string | null };
+export type DeviationCondition = { parameter: string; compare: CompareOperator; value: number; unit: string | null; use: ParameterUse | null };
 export type DeviationSource = { page: number | null; codes: string[]; origin: "instruction" | "company" };
 export type DeviationDocument = { id: string; edition: string; change: string | null; effectiveFrom: string | null; appendix: string | null };
 
@@ -52,7 +79,7 @@ export type DeviationRule = {
   aircraftId: string;
   name: { ru: string; en: string | null };
   category: DeviationCategory;
-  summaryRow: string | null;
+  summaryRow: SummaryRow | null;
   source: DeviationSource;
   match: DeviationMatch;
   trigger: DeviationTrigger;
@@ -219,6 +246,13 @@ function parseSourceInfo(raw: unknown, path: string, issues: Issues): DeviationS
   return { page, codes, origin };
 }
 
+function parseUse(value: unknown, path: string, issues: Issues): ParameterUse | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "string" && (parameterUses as readonly string[]).includes(value)) return value as ParameterUse;
+  issues.push(`${path}: ожидалось одно из ${parameterUses.join(", ")}, получено ${describe(value)}`);
+  return null;
+}
+
 function parseMatch(raw: unknown, path: string, issues: Issues): DeviationMatch | null {
   if (!isRecord(raw)) {
     issues.push(`${path}: ожидался объект, получено ${describe(raw)}`);
@@ -228,11 +262,7 @@ function parseMatch(raw: unknown, path: string, issues: Issues): DeviationMatch 
     checkKeys(raw, ["kind", "textContains", "parameter", "use", "patternVerified"], path, issues);
     const textContains = readString(raw, "textContains", path, issues);
     const parameter = readOptionalString(raw, "parameter", path, issues);
-    let use: "max" | "min" = "max";
-    if (raw.use !== undefined && raw.use !== null) {
-      if (raw.use === "max" || raw.use === "min") use = raw.use;
-      else issues.push(`${path}.use: ожидалось "max" или "min", получено ${describe(raw.use)}`);
-    }
+    const use = parseUse(raw.use, `${path}.use`, issues) ?? "max";
     const patternVerified = readOptionalBoolean(raw, "patternVerified", path, issues) ?? false;
     if (!textContains) return null;
     return { kind: "event", textContains, parameter, use, patternVerified };
@@ -317,7 +347,13 @@ function parseTrigger(raw: unknown, path: string, issues: Issues): DeviationTrig
     }
     return { type: "occurrence", level: level as DeviationLevel, description };
   }
-  issues.push(`${path}.type: ожидалось "threshold" или "occurrence", получено ${describe(raw.type)}`);
+  if (raw.type === "manual") {
+    checkKeys(raw, ["type", "reason"], path, issues);
+    const reason = readString(raw, "reason", path, issues);
+    if (!reason) return null;
+    return { type: "manual", reason };
+  }
+  issues.push(`${path}.type: ожидалось "threshold", "occurrence" или "manual", получено ${describe(raw.type)}`);
   return null;
 }
 
@@ -334,12 +370,13 @@ function parseConditions(raw: unknown, path: string, issues: Issues): DeviationC
       issues.push(`${entryPath}: ожидался объект, получено ${describe(entry)}`);
       return;
     }
-    checkKeys(entry, ["parameter", "compare", "value", "unit"], entryPath, issues);
+    checkKeys(entry, ["parameter", "compare", "value", "unit", "use"], entryPath, issues);
     const parameter = readString(entry, "parameter", entryPath, issues);
     const compare = parseCompare(entry.compare, `${entryPath}.compare`, issues);
     const value = readNumber(entry.value, `${entryPath}.value`, issues);
     const unit = readOptionalString(entry, "unit", entryPath, issues);
-    if (parameter && compare && value !== null) conditions.push({ parameter, compare, value, unit });
+    const use = parseUse(entry.use, `${entryPath}.use`, issues);
+    if (parameter && compare && value !== null) conditions.push({ parameter, compare, value, unit, use });
   });
   return conditions;
 }
@@ -370,7 +407,12 @@ function parseRule(raw: unknown, index: number, aircraftId: string, issues: Issu
   } else {
     issues.push(`${path}.category: ожидалась одна из категорий (${deviationCategories.join(", ")}), получено ${describe(raw.category)}`);
   }
-  const summaryRow = readOptionalString(raw, "summaryRow", path, issues);
+  const summaryRowRaw = readOptionalString(raw, "summaryRow", path, issues);
+  let summaryRow: SummaryRow | null = null;
+  if (summaryRowRaw !== null) {
+    if ((summaryRows as readonly string[]).includes(summaryRowRaw)) summaryRow = summaryRowRaw as SummaryRow;
+    else issues.push(`${path}.summaryRow: строки «${summaryRowRaw}» нет в сводной таблице приложения № 5А`);
+  }
   const source = parseSourceInfo(raw.source, `${path}.source`, issues);
   const match = parseMatch(raw.match, `${path}.match`, issues);
   const trigger = parseTrigger(raw.trigger, `${path}.trigger`, issues);

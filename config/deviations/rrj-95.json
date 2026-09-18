@@ -28,20 +28,422 @@
         "codes": [
           "317",
           "319",
-          "321"
+          "320"
         ],
         "origin": "instruction"
       },
       "match": {
         "kind": "event",
-        "textContains": "не проводилась или проведена не в полном объеме",
+        "textContains": "не проводилась или проведена не в полном объеме проверка",
         "patternVerified": true
       },
       "trigger": {
         "type": "occurrence",
         "level": 4,
         "description": "N/C — проверка не выполнена"
+      },
+      "note": "Источник формирует отдельное событие на каждую поверхность управления (руль направления, руль высоты, элероны, спойлеры), поэтому один рейс даёт несколько событий одного норматива."
+    },
+    {
+      "id": "takeoff-weight-above-max",
+      "name": {
+        "ru": "Масса самолёта на взлёте больше максимально допустимой",
+        "en": "Takeoff Weight > Max Takeoff Weight"
+      },
+      "category": "Warning",
+      "summaryRow": "отклонение выполнения СОП",
+      "source": {
+        "page": 76,
+        "codes": [
+          "036"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Масса самолета на взлете больше максимально",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4,
+        "description": "MTOW"
       }
+    },
+    {
+      "id": "vmo-exceedance",
+      "name": {
+        "ru": "Превышена максимально допустимая эксплуатационная скорость полёта (308 kts)",
+        "en": "VMO Exceedance"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 76,
+        "codes": [
+          "045"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "максимально допустимая эксплуатационная скорость",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4,
+        "description": "VMO"
+      }
+    },
+    {
+      "id": "mmo-exceedance",
+      "name": {
+        "ru": "Превышено максимально допустимое число М полёта (0.81)",
+        "en": "MMO Exceedance"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 76,
+        "codes": [
+          "046"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "максимально допустимое эксплуатационное число М",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4,
+        "description": "MMO"
+      }
+    },
+    {
+      "id": "vfe-exceedance",
+      "name": {
+        "ru": "Превышена допустимая скорость с выпущенной механизацией",
+        "en": "Exceedance of Flaps/Slat Limit Speed in flight"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 76,
+        "codes": [
+          "056",
+          "057",
+          "058",
+          "059",
+          "060",
+          "061",
+          "062",
+          "063",
+          "064",
+          "065"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "больше допустимой VFE",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4,
+        "description": "VFE"
+      }
+    },
+    {
+      "id": "vlo-ret-exceedance",
+      "name": {
+        "ru": "Скорость при уборке шасси больше допустимой VLO RET (215 kts)",
+        "en": "Landing Gear Retraction above VLO RET"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 77,
+        "codes": [
+          "069"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "при уборке шасси больше допустимой",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4,
+        "description": "VLO RET"
+      }
+    },
+    {
+      "id": "vlo-ext-exceedance",
+      "name": {
+        "ru": "Скорость при выпуске шасси больше допустимой VLO EXT (255 kts)",
+        "en": "Landing Gear Extension above VLO EXT"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 77,
+        "codes": [
+          "070"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Landing Gear Extension above VLO EXT",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4,
+        "description": "VLO EXT"
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "vle-exceedance",
+      "name": {
+        "ru": "Скорость полёта с выпущенным шасси больше допустимой VLE (255 kts)",
+        "en": "Landing Gear Extended Speed VLE Exceedance"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 77,
+        "codes": [
+          "071"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Landing Gear Extended Speed VLE Exceedance",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4,
+        "description": "VLE"
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "tire-limit-speed",
+      "name": {
+        "ru": "Превышена предельная скорость по пневматикам (195 kts)",
+        "en": "Tire Limit Speed High"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 77,
+        "codes": [
+          "080",
+          "081"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Tire Limit Speed High",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "manual",
+        "reason": "уровень задан длительностью превышения (TOL > 3 с — 3 уровень, > 6 с — 4 уровень), длительности в выгрузке нет"
+      }
+    },
+    {
+      "id": "speed-below-vls-high-alt",
+      "name": {
+        "ru": "Скорость полёта менее VLS",
+        "en": "Speed Low (High ALT)"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 77,
+        "codes": [
+          "391",
+          "392"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "меньше минимальной выбираемой скорости VLS",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "manual",
+        "reason": "уровень задан длительностью (TOL > 4 / 6 / 8 с), длительности в выгрузке нет"
+      }
+    },
+    {
+      "id": "approach-speed-high-med-alt",
+      "name": {
+        "ru": "Скорость захода более заданной Vapp (50–1000 ft)",
+        "en": "Approach Speed High (Med ALT)"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 77,
+        "codes": [
+          "405",
+          "406"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "превышение заданной скорости полета VAPP",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "manual",
+        "reason": "порог отсчитывается от VAPP (+15 / +20 / +25 kts): нужна разница Vcom − Vsel, оба параметра в событии есть"
+      }
+    },
+    {
+      "id": "approach-speed-low-med-alt",
+      "name": {
+        "ru": "Скорость захода менее заданной Vapp (50–1000 ft)",
+        "en": "Approach Speed Low (Med ALT)"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 77,
+        "codes": [
+          "407"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Approach Speed Low (Med ALT)",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "manual",
+        "reason": "порог отсчитывается от VAPP (−8 / −10 / −12 kts)"
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "approach-speed-high-at-50ft",
+      "name": {
+        "ru": "На H = 50 ft скорость захода более заданной Vapp",
+        "en": "Approach Speed High (Low ALT) at 50ft"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 77,
+        "codes": [
+          "179"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Approach Speed High (Low ALT) at 50ft",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "manual",
+        "reason": "порог отсчитывается от VAPP (+10 / +15 / +20 kts)"
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "approach-speed-low-at-50ft",
+      "name": {
+        "ru": "На H = 50 ft скорость захода менее заданной Vref",
+        "en": "Approach Speed Low (Low ALT) at 50ft"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 77,
+        "codes": [
+          "181"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Approach Speed Low (Low ALT) at 50ft",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "manual",
+        "reason": "порог отсчитывается от VREF (−2 / −4 / −6 kts)"
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "low-speed-at-landing",
+      "name": {
+        "ru": "При приземлении скорость полёта менее VLS",
+        "en": "Low Speed at Landing"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 77,
+        "codes": [
+          "470"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Low Speed at Landing",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "manual",
+        "reason": "порог отсчитывается от VLS (−8 / −10 / −12 kts)"
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "high-speed-at-landing",
+      "name": {
+        "ru": "При приземлении скорость полёта более VREF",
+        "en": "High Speed at Landing"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 77,
+        "codes": [
+          "405-407"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "High Speed at Landing",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "manual",
+        "reason": "порог отсчитывается от VREF (+15 / +20 / +25 kts)"
+      },
+      "note": "Текст события в выгрузке не встречался."
     },
     {
       "id": "pitch-high-at-touchdown",
@@ -60,9 +462,10 @@
       },
       "match": {
         "kind": "event",
-        "textContains": "угол тангажа",
-        "parameter": "Pitch",
-        "patternVerified": false
+        "textContains": "Тангаж на выравнивании перед посадкой",
+        "parameter": "PITCH",
+        "use": "abs",
+        "patternVerified": true
       },
       "trigger": {
         "type": "threshold",
@@ -76,6 +479,330 @@
       }
     },
     {
+      "id": "landing-on-nose-gear",
+      "name": {
+        "ru": "Посадка на переднюю опору шасси",
+        "en": "Landing on Nose Landing Gear"
+      },
+      "category": "Attitude",
+      "source": {
+        "page": 77,
+        "codes": [
+          "76"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Посадка на ПОШ",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "excessive-bank-angle-at-landing",
+      "name": {
+        "ru": "Большой угол крена на выравнивании и посадке (100–0 ft)",
+        "en": "Excessive Bank Angle in Approach (Low ALT)"
+      },
+      "category": "Attitude",
+      "summaryRow": "крен (Roll°) более допустимого",
+      "source": {
+        "page": 78,
+        "codes": [
+          "460",
+          "463"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Угол крена на выравнивании перед посадкой",
+        "parameter": "ROLL",
+        "use": "abs",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greaterOrEqual",
+        "unit": "°",
+        "levels": {
+          "2": 7,
+          "3": {
+            "value": 9,
+            "compare": "greater"
+          },
+          "4": {
+            "value": 11,
+            "compare": "greater"
+          }
+        }
+      },
+      "note": "Инструкция делит норматив на полосы 100–30 ft и 30–0 ft, но пороги у них одинаковые, поэтому правило одно."
+    },
+    {
+      "id": "excessive-bank-angle-unstable-approach",
+      "name": {
+        "ru": "Большой угол крена на заходе (нестабилизированный заход)",
+        "en": "Excessive Bank Angle in Approach"
+      },
+      "category": "Attitude",
+      "summaryRow": "крен (Roll°) более допустимого",
+      "source": {
+        "page": 78,
+        "codes": [
+          "460",
+          "463"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Нестабилизированный заход: угол крена",
+        "parameter": "ROLL",
+        "use": "abs",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greaterOrEqual",
+        "unit": "°",
+        "levels": {
+          "2": 7,
+          "3": {
+            "value": 9,
+            "compare": "greater"
+          },
+          "4": {
+            "value": 11,
+            "compare": "greater"
+          }
+        }
+      },
+      "note": "Источник не сообщает высоту полосы напрямую; пороги взяты по полосе 100–0 ft, как у события на выравнивании."
+    },
+    {
+      "id": "excessive-bank-angle-approach-med-alt",
+      "name": {
+        "ru": "Большой угол крена на заходе (400–100 ft)",
+        "en": "Excessive Bank Angle in Approach (Med ALT)"
+      },
+      "category": "Attitude",
+      "summaryRow": "крен (Roll°) более допустимого",
+      "source": {
+        "page": 78,
+        "codes": [
+          "441"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Excessive Bank Angle in Approach (Med ALT)",
+        "parameter": "ROLL",
+        "use": "abs",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greater",
+        "unit": "°",
+        "levels": {
+          "2": 10,
+          "3": 15,
+          "4": 20
+        }
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "excessive-bank-angle-approach-high-alt",
+      "name": {
+        "ru": "Большой угол крена на заходе (1000–400 ft)",
+        "en": "Excessive Bank Angle in Approach (High ALT)"
+      },
+      "category": "Attitude",
+      "summaryRow": "крен (Roll°) более допустимого",
+      "source": {
+        "page": 78,
+        "codes": [
+          "371"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Excessive Bank Angle in Approach (High ALT)",
+        "parameter": "ROLL",
+        "use": "abs",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greater",
+        "unit": "°",
+        "levels": {
+          "2": 25,
+          "3": 30,
+          "4": 35
+        }
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "excessive-bank-angle-in-flight",
+      "name": {
+        "ru": "Большой угол крена в полёте (H > 1000 ft)",
+        "en": "Excessive Bank Angle (Very High ALT)"
+      },
+      "category": "Attitude",
+      "summaryRow": "крен (Roll°) более допустимого",
+      "source": {
+        "page": 78,
+        "codes": [
+          "371",
+          "372",
+          "373"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Угол крена в полете более",
+        "parameter": "ROLL",
+        "use": "abs",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "manual",
+        "reason": "уровень задан длительностью крена более 35° (TOL ≥ 2 / 4 / 6 с), длительности в выгрузке нет"
+      }
+    },
+    {
+      "id": "excessive-bank-angle-in-climb",
+      "name": {
+        "ru": "Большой угол крена на взлёте (101–400 ft)",
+        "en": "Excessive Bank Angle in Climb"
+      },
+      "category": "Roll",
+      "summaryRow": "крен (Roll°) более допустимого",
+      "source": {
+        "page": 78,
+        "codes": [
+          "349"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Excessive Bank Angle in Climb",
+        "parameter": "ROLL",
+        "use": "abs",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greater",
+        "unit": "°",
+        "levels": {
+          "2": 15,
+          "3": 20,
+          "4": 25
+        }
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "late-landing-gear-retraction",
+      "name": {
+        "ru": "Поздняя уборка шасси",
+        "en": "Late Landing Gear Retraction"
+      },
+      "category": "Configuration",
+      "summaryRow": "конфигурация",
+      "source": {
+        "page": 78,
+        "codes": [
+          "351"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "При взлете шасси не убраны на высоте",
+        "parameter": "Hg",
+        "use": "min",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greater",
+        "unit": "ft",
+        "levels": {
+          "2": 400,
+          "3": 500,
+          "4": 1500
+        }
+      },
+      "note": "Высота уборки берётся как нижняя граница окна события (Hg min); верхняя граница окна уходит далеко в набор и для норматива не годится."
+    },
+    {
+      "id": "high-acceleration-in-flight-clean",
+      "name": {
+        "ru": "Большая перегрузка в полёте с убранной механизацией",
+        "en": "High Acceleration in Flight (Flaps and Slats retracted)"
+      },
+      "category": "Acceleration",
+      "source": {
+        "page": 78,
+        "codes": [
+          "130",
+          "131"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "High Acceleration in Flight (Maneuvering with Flaps and Slats retracted)",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "high-acceleration-in-flight-flaps",
+      "name": {
+        "ru": "Большая перегрузка в полёте с выпущенной механизацией",
+        "en": "High Acceleration in Flight (Flaps and Slats extended)"
+      },
+      "category": "Acceleration",
+      "source": {
+        "page": 78,
+        "codes": [
+          "132",
+          "133"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "High Acceleration in Flight (Maneuvering with Flaps and Slats extended)",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
       "id": "high-acceleration-at-touchdown",
       "name": {
         "ru": "Повышенная вертикальная перегрузка на посадке",
@@ -85,6 +812,9 @@
       "summaryRow": "повышенная перегрузка при посадке Ny",
       "source": {
         "page": 78,
+        "codes": [
+          "477"
+        ],
         "origin": "instruction"
       },
       "match": {
@@ -107,7 +837,81 @@
           }
         }
       },
-      "note": "По инструкции 4 уровень — строго более 2.0 g, поэтому знак сравнения у уровня свой."
+      "note": "Инструкция применяет норматив при VyHg > 300 fpm; отбор по вертикальной скорости уже выполняет источник, в событии VyHg нет. Ny16 — другой датчик, брать нужно Ny."
+    },
+    {
+      "id": "hard-landing",
+      "name": {
+        "ru": "Грубая посадка (по перегрузке)",
+        "en": "High Acceleration at Touch Down"
+      },
+      "category": "Acceleration",
+      "summaryRow": "повышенная перегрузка при посадке Ny",
+      "source": {
+        "page": 78,
+        "codes": [
+          "477"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Грубая посадка при посадочном весе",
+        "parameter": "Ny",
+        "use": "max",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greaterOrEqual",
+        "unit": "g",
+        "levels": {
+          "2": 1.76,
+          "3": 1.81,
+          "4": {
+            "value": 2.0,
+            "compare": "greater"
+          }
+        }
+      },
+      "note": "Тот же норматив, что и high-acceleration-at-touchdown, другой текст события."
+    },
+    {
+      "id": "very-hard-landing",
+      "name": {
+        "ru": "Очень грубая посадка (по перегрузке)",
+        "en": "High Acceleration at Touch Down"
+      },
+      "category": "Acceleration",
+      "summaryRow": "повышенная перегрузка при посадке Ny",
+      "source": {
+        "page": 78,
+        "codes": [
+          "477"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Очень грубая посадка при посадочном весе",
+        "parameter": "Ny",
+        "use": "max",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greaterOrEqual",
+        "unit": "g",
+        "levels": {
+          "2": 1.76,
+          "3": 1.81,
+          "4": {
+            "value": 2.0,
+            "compare": "greater"
+          }
+        }
+      },
+      "note": "Тот же норматив, что и high-acceleration-at-touchdown, другой текст события."
     },
     {
       "id": "high-vertical-speed-at-touchdown",
@@ -115,17 +919,23 @@
         "ru": "Повышенная вертикальная скорость на посадке",
         "en": "High Vertical Speed at Touchdown"
       },
-      "category": "Acceleration",
+      "category": "VerticalRate",
       "summaryRow": "повышенная вертикальная скорость Vy",
       "source": {
         "page": 78,
+        "codes": [
+          "479",
+          "481",
+          "482"
+        ],
         "origin": "instruction"
       },
       "match": {
         "kind": "event",
-        "textContains": "вертикальной скоростью",
-        "parameter": "Vy",
-        "patternVerified": false
+        "textContains": "Грубая посадка при посадочном весе",
+        "parameter": "VyHg",
+        "use": "abs",
+        "patternVerified": true
       },
       "trigger": {
         "type": "threshold",
@@ -137,18 +947,361 @@
           "4": 510
         }
       },
-      "note": "Пороги 3 и 4 уровня изменены Изменением 01 от 10.10.2024."
+      "note": "Событие о грубой посадке несёт и Ny, и VyHg — это два разных норматива инструкции, поэтому классифицируются оба."
+    },
+    {
+      "id": "very-high-vertical-speed-at-touchdown",
+      "name": {
+        "ru": "Повышенная вертикальная скорость на посадке (очень грубая)",
+        "en": "High Vertical Speed at Touchdown"
+      },
+      "category": "VerticalRate",
+      "summaryRow": "повышенная вертикальная скорость Vy",
+      "source": {
+        "page": 78,
+        "codes": [
+          "479",
+          "481",
+          "482"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Очень грубая посадка при посадочном весе",
+        "parameter": "VyHg",
+        "use": "abs",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greater",
+        "unit": "fpm",
+        "levels": {
+          "2": 420,
+          "3": 460,
+          "4": 510
+        }
+      }
+    },
+    {
+      "id": "max-operating-altitude",
+      "name": {
+        "ru": "Превышена максимально допустимая высота полёта",
+        "en": "Maximum Operating Altitude Exceedance"
+      },
+      "category": "Warning",
+      "source": {
+        "page": 79,
+        "codes": [
+          "041"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Maximum Operating Altitude Exceedance",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "manual",
+        "reason": "уровень задан длительностью (TOL > 3 с)"
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "flaps-slats-altitude-limit",
+      "name": {
+        "ru": "Полёт с выпущенной механизацией выше допустимой высоты (20000 ft)",
+        "en": "Exceedance of Flaps/Slats Altitude Limit"
+      },
+      "category": "Warning",
+      "summaryRow": "конфигурация",
+      "source": {
+        "page": 79,
+        "codes": [
+          "042"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "выпущенной механизацией крыла на высоте более допустимой",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4
+      }
+    },
+    {
+      "id": "takeoff-warning",
+      "name": {
+        "ru": "Срабатывание сигнализации Take off Warning",
+        "en": "Take off Warning"
+      },
+      "category": "Warning",
+      "summaryRow": "оповещение",
+      "source": {
+        "page": 79,
+        "codes": [
+          "329",
+          "330",
+          "331",
+          "332",
+          "333",
+          "334"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Take off Warning",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4,
+        "description": "Event at T/O"
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "taws-warning-avoid-terrain",
+      "name": {
+        "ru": "Речевое сообщение AVOID TERRAIN / AVOID OBSTACLE",
+        "en": "TAWS Warning"
+      },
+      "category": "Warning",
+      "summaryRow": "оповещение",
+      "source": {
+        "page": 79,
+        "codes": [
+          "1225",
+          "1226",
+          "1227",
+          "1228",
+          "1231"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "избегай земли",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4
+      }
+    },
+    {
+      "id": "taws-warning-pull-up",
+      "name": {
+        "ru": "Речевое сообщение TERRAIN AHEAD, PULL UP",
+        "en": "TAWS Warning"
+      },
+      "category": "Warning",
+      "summaryRow": "оповещение",
+      "source": {
+        "page": 79,
+        "codes": [
+          "1225",
+          "1226",
+          "1227",
+          "1228",
+          "1231"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "впереди земля, тяни вверх",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4
+      }
+    },
+    {
+      "id": "taws-warning-terrain-closure",
+      "name": {
+        "ru": "Сигнализация СРПБЗ о сближении с землёй (уровень Warning)",
+        "en": "TAWS Warning"
+      },
+      "category": "Warning",
+      "summaryRow": "оповещение",
+      "source": {
+        "page": 79,
+        "codes": [
+          "1225",
+          "1226",
+          "1227",
+          "1228",
+          "1231"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "СРПБЗ о сближении с землей",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4
+      }
+    },
+    {
+      "id": "early-flap-retraction-after-takeoff",
+      "name": {
+        "ru": "Раннее по высоте начало уборки механизации после взлёта",
+        "en": "Early Flap/Slat Retraction after Take Off"
+      },
+      "category": "Configuration",
+      "summaryRow": "конфигурация",
+      "source": {
+        "page": 79,
+        "codes": [
+          "352"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Early Flap/Slat Retraction after Take Off",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4,
+        "description": "AGL < 400 ft"
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "late-landing-flap-setting",
+      "name": {
+        "ru": "Поздний довыпуск механизации в посадочное положение",
+        "en": "Late Landing Flap Setting"
+      },
+      "category": "Configuration",
+      "summaryRow": "конфигурация",
+      "source": {
+        "page": 80,
+        "codes": [
+          "427",
+          "428"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "поздний довыпуск механизации крыла",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4
+      }
+    },
+    {
+      "id": "landing-gear-not-locked-down",
+      "name": {
+        "ru": "Шасси не выпущено ниже 1000 ft AFE",
+        "en": "Landing Gear Not Locked Down Below 1000ft AFE"
+      },
+      "category": "Configuration",
+      "summaryRow": "конфигурация",
+      "source": {
+        "page": 80,
+        "codes": [
+          "435"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "LDG GEAR NOT DOWN",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4
+      }
+    },
+    {
+      "id": "overweight-landing",
+      "name": {
+        "ru": "Масса самолёта на посадке больше максимально допустимой (41000 кг)",
+        "en": "Overweight Landing"
+      },
+      "category": "Procedure",
+      "summaryRow": "отклонение выполнения СОП",
+      "source": {
+        "page": 80,
+        "codes": [
+          "037"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "при посадке больше максимально допустимой",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4
+      }
+    },
+    {
+      "id": "short-touchdown",
+      "name": {
+        "ru": "Недолёт: расстояние от торца ВПП до касания менее 200 м",
+        "en": "Short Touchdown"
+      },
+      "category": "Alignment",
+      "source": {
+        "page": 80,
+        "codes": [
+          "5474"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "до касания менее",
+        "parameter": "Sdis",
+        "use": "min",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "less",
+        "unit": "м",
+        "levels": {
+          "2": 200,
+          "3": 150,
+          "4": 100
+        }
+      },
+      "note": "Текст события в выгрузке не встречался."
     },
     {
       "id": "long-touchdown",
       "name": {
-        "ru": "Перелёт при посадке",
+        "ru": "Перелёт: расстояние от торца ВПП до касания более 900 м",
         "en": "Long Touchdown"
       },
-      "category": "Other",
+      "category": "Alignment",
       "summaryRow": "перелёт при посадке",
       "source": {
-        "page": 79,
+        "page": 80,
+        "codes": [
+          "475"
+        ],
         "origin": "instruction"
       },
       "match": {
@@ -170,91 +1323,49 @@
       }
     },
     {
-      "id": "short-touchdown",
+      "id": "reverser-max-at-low-speed",
       "name": {
-        "ru": "Недолёт при посадке",
-        "en": "Short Touchdown"
+        "ru": "Режим REV MAX на скорости менее 65 kts",
+        "en": "Use of Reverser at Low Speed"
       },
-      "category": "Other",
-      "summaryRow": "перелёт при посадке",
+      "category": "Engine",
+      "summaryRow": "конфигурация",
       "source": {
-        "page": 79,
-        "origin": "instruction"
-      },
-      "match": {
-        "kind": "event",
-        "textContains": "до касания менее",
-        "parameter": "Sdis",
-        "use": "min",
-        "patternVerified": false
-      },
-      "trigger": {
-        "type": "threshold",
-        "compare": "less",
-        "unit": "м",
-        "levels": {
-          "2": 200,
-          "3": 150,
-          "4": 100
-        }
-      }
-    },
-    {
-      "id": "excessive-bank-angle-low-alt-30-0",
-      "name": {
-        "ru": "Большой угол крена на заходе, 30–0 ft",
-        "en": "Excessive Bank Angle in Approach (Low ALT) 30-0 ft"
-      },
-      "category": "Attitude",
-      "summaryRow": "крен (Roll) более допустимого",
-      "source": {
-        "page": 78,
+        "page": 80,
         "codes": [
-          "460",
-          "463"
+          "205"
         ],
         "origin": "instruction"
       },
       "match": {
         "kind": "event",
-        "textContains": "крена",
-        "parameter": "Roll",
-        "patternVerified": false
+        "textContains": "REV MAX на скорости менее",
+        "patternVerified": true
       },
       "trigger": {
-        "type": "threshold",
-        "compare": "greaterOrEqual",
-        "unit": "°",
-        "levels": {
-          "2": 7,
-          "3": {
-            "value": 9,
-            "compare": "greater"
-          },
-          "4": {
-            "value": 11,
-            "compare": "greater"
-          }
-        }
+        "type": "occurrence",
+        "level": 2,
+        "description": "Event — засчитывается сам факт"
       }
     },
     {
-      "id": "reverser-at-low-speed",
+      "id": "reverser-idle-at-low-speed",
       "name": {
-        "ru": "Использование реверса на малой скорости",
+        "ru": "Режим REV IDLE на скорости менее 30 kts",
         "en": "Use of Reverser at Low Speed"
       },
-      "category": "Configuration",
-      "summaryRow": "отклонение выполнения СОП",
+      "category": "Engine",
+      "summaryRow": "конфигурация",
       "source": {
-        "page": 84,
+        "page": 80,
+        "codes": [
+          "204"
+        ],
         "origin": "instruction"
       },
       "match": {
         "kind": "event",
-        "textContains": "менее 65 knots",
-        "parameter": "Vcom",
-        "use": "min",
+        "textContains": "REV IDLE на скорости менее",
         "patternVerified": true
       },
       "trigger": {
@@ -269,10 +1380,14 @@
         "ru": "Включение реверса тяги в полёте",
         "en": "Engine reverser selected in flight"
       },
-      "category": "Warning",
+      "category": "Engine",
       "summaryRow": "конфигурация",
       "source": {
-        "page": 84,
+        "page": 80,
+        "codes": [
+          "200",
+          "201"
+        ],
         "origin": "instruction"
       },
       "match": {
@@ -284,7 +1399,707 @@
         "type": "occurrence",
         "level": 4,
         "description": "Event 3s before T/D"
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "engine-cooling-time",
+      "name": {
+        "ru": "Время прогрева двигателя после запуска менее 3 минут",
+        "en": "Engine Cooling Time after N1>50% use"
+      },
+      "category": "Engine",
+      "summaryRow": "отклонение выполнения СОП",
+      "source": {
+        "page": 80,
+        "codes": [
+          "500",
+          "501"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "время прогрева",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4
+      },
+      "note": "Источник формирует отдельное событие на каждый двигатель."
+    },
+    {
+      "id": "nose-gear-lift-below-vr",
+      "name": {
+        "ru": "Подъём передней опоры на скорости менее Vr",
+        "en": "Nose Gear Lift below VR"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 81,
+        "codes": [
+          "340"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "подъем ПОШ на скорости менее",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "manual",
+        "reason": "порог отсчитывается от VR (−8 / −10 / −12 kts)"
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "speed-below-v2-after-takeoff",
+      "name": {
+        "ru": "При взлёте скорость полёта менее V2",
+        "en": "Speed below V2"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 81,
+        "codes": [
+          "346"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "скорость полета менее V2",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "manual",
+        "reason": "уровень задан длительностью (TOL > 4 / 6 с)"
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "glideslope-deviation",
+      "name": {
+        "ru": "Отклонение от равносигнальной зоны глиссады более 1 dot",
+        "en": "Glideslope Deviation"
+      },
+      "category": "Alignment",
+      "summaryRow": "отклонение LOC, G/S, G/P",
+      "source": {
+        "page": 81,
+        "codes": [
+          "419",
+          "420"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "равносигнальной зоны глиссады",
+        "parameter": "GSdev1",
+        "use": "abs",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greaterOrEqual",
+        "unit": "dot",
+        "levels": {
+          "2": 1.0,
+          "3": 1.2,
+          "4": 1.5
+        }
+      },
+      "note": "В событии два приёмника (GSdev1 и GSdev2) с близкими значениями; берётся GSdev1, чтобы не считать одно отклонение дважды."
+    },
+    {
+      "id": "localizer-deviation",
+      "name": {
+        "ru": "Отклонение от равносигнальной зоны курса более 1 dot",
+        "en": "Localizer Deviation"
+      },
+      "category": "Alignment",
+      "summaryRow": "отклонение LOC, G/S, G/P",
+      "source": {
+        "page": 81,
+        "codes": [
+          "421"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "равносигнальной зоны курса",
+        "parameter": "LOCdev1",
+        "use": "abs",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greaterOrEqual",
+        "unit": "dot",
+        "levels": {
+          "2": 1.0,
+          "3": 1.2,
+          "4": 1.5
+        }
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "high-rate-of-descent-med-alt",
+      "name": {
+        "ru": "Повышенная вертикальная скорость снижения (1000–500 ft)",
+        "en": "High Rate of Descent (Med ALT)"
+      },
+      "category": "VerticalRate",
+      "summaryRow": "повышенная вертикальная скорость Vy",
+      "source": {
+        "page": 81,
+        "codes": [
+          "415"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "вертикальная скорость снижения на глиссаде",
+        "parameter": "Vy",
+        "use": "abs",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greater",
+        "unit": "fpm",
+        "levels": {
+          "3": 1100
+        }
+      },
+      "conditions": [
+        {
+          "parameter": "Hg",
+          "compare": "greaterOrEqual",
+          "value": 500,
+          "unit": "ft",
+          "use": "max"
+        }
+      ]
+    },
+    {
+      "id": "high-rate-of-descent-low-alt",
+      "name": {
+        "ru": "Повышенная вертикальная скорость снижения (499–50 ft)",
+        "en": "High Rate of Descent (Low ALT)"
+      },
+      "category": "VerticalRate",
+      "summaryRow": "повышенная вертикальная скорость Vy",
+      "source": {
+        "page": 81,
+        "codes": [
+          "415"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "вертикальная скорость снижения на глиссаде",
+        "parameter": "Vy",
+        "use": "abs",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greater",
+        "unit": "fpm",
+        "levels": {
+          "4": 1100
+        }
+      },
+      "conditions": [
+        {
+          "parameter": "Hg",
+          "compare": "less",
+          "value": 500,
+          "unit": "ft",
+          "use": "max"
+        }
+      ]
+    },
+    {
+      "id": "voice-speed-speed",
+      "name": {
+        "ru": "Речевое сообщение SPEED, SPEED, SPEED",
+        "en": "Voice message SPEED"
+      },
+      "category": "Speed",
+      "summaryRow": "оповещение",
+      "source": {
+        "page": 81,
+        "codes": [
+          "078"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Речевое сообщение SPEED",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 3
       }
+    },
+    {
+      "id": "voice-stall",
+      "name": {
+        "ru": "Речевое сообщение STALL",
+        "en": "Voice message STALL"
+      },
+      "category": "Speed",
+      "summaryRow": "оповещение",
+      "source": {
+        "page": 81,
+        "codes": [
+          "079"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Речевое сообщение STALL",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "eicas-landing-flaps-not-land",
+      "name": {
+        "ru": "Сигнализация LDG FLAPS/SLATS NOT LAND",
+        "en": "EICAS Warning LDG FLAPS/SLATS NOT LAND"
+      },
+      "category": "Warning",
+      "summaryRow": "оповещение",
+      "source": {
+        "page": 81,
+        "codes": [
+          "429"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "LDG FLAPS/SLATS NOT LAND",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 3
+      }
+    },
+    {
+      "id": "taws-caution-terrain-ahead",
+      "name": {
+        "ru": "Речевое сообщение TERRAIN AHEAD",
+        "en": "TAWS Caution TERRAIN AHEAD"
+      },
+      "category": "Caution",
+      "summaryRow": "оповещение",
+      "source": {
+        "page": 81,
+        "codes": [
+          "1228"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "впереди земля / препятствие",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 2
+      }
+    },
+    {
+      "id": "taws-caution-glideslope",
+      "name": {
+        "ru": "Речевое сообщение GLIDESLOPE",
+        "en": "TAWS Caution GLIDESLOPE"
+      },
+      "category": "Caution",
+      "summaryRow": "оповещение",
+      "source": {
+        "page": 81,
+        "codes": [
+          "1242"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Речевое сообщение GLIDESLOPE",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 2
+      }
+    },
+    {
+      "id": "taws-caution-too-low-flaps",
+      "name": {
+        "ru": "Речевое сообщение TOO LOW, FLAPS",
+        "en": "TAWS Caution TOO LOW FLAPS"
+      },
+      "category": "Caution",
+      "summaryRow": "оповещение",
+      "source": {
+        "page": 81,
+        "codes": [
+          "1237"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "TOO LOW, FLAPS",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 3
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "taws-caution-too-low-gear",
+      "name": {
+        "ru": "Речевое сообщение TOO LOW, GEAR",
+        "en": "TAWS Caution TOO LOW GEAR"
+      },
+      "category": "Caution",
+      "summaryRow": "оповещение",
+      "source": {
+        "page": 81,
+        "codes": [
+          "1236"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "TOO LOW, GEAR",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 3
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "taws-caution-dont-sink",
+      "name": {
+        "ru": "Речевое сообщение DON'T SINK",
+        "en": "TAWS Caution DON'T SINK"
+      },
+      "category": "Caution",
+      "summaryRow": "оповещение",
+      "source": {
+        "page": 81,
+        "codes": [
+          "1233"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "не снижайся",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 2
+      },
+      "note": "Апостроф в DON'T в выгрузке ненадёжен, поэтому образец взят по русской части текста."
+    },
+    {
+      "id": "taws-caution-terrain-terrain",
+      "name": {
+        "ru": "Речевое сообщение TERRAIN, TERRAIN",
+        "en": "TAWS Caution TERRAIN TERRAIN"
+      },
+      "category": "Caution",
+      "summaryRow": "оповещение",
+      "source": {
+        "page": 81,
+        "codes": [
+          "1229"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "TERRAIN TERRAIN",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 2
+      }
+    },
+    {
+      "id": "taws-caution-sink-rate",
+      "name": {
+        "ru": "Речевое сообщение SINK RATE",
+        "en": "TAWS Caution SINK RATE"
+      },
+      "category": "Caution",
+      "summaryRow": "оповещение",
+      "source": {
+        "page": 82,
+        "codes": [
+          "1232"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "SINK RATE",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 2
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "taws-caution-bank-angle",
+      "name": {
+        "ru": "Речевое сообщение BANK ANGLE",
+        "en": "TAWS Caution BANK ANGLE"
+      },
+      "category": "Caution",
+      "summaryRow": "оповещение",
+      "source": {
+        "page": 82,
+        "codes": [
+          "1235"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "BANK ANGLE",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 3
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "taxi-speed-straight",
+      "name": {
+        "ru": "Скорость на рулении по прямой более 30 kts",
+        "en": "Taxi Speed Exceedance in Straight Line"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 82,
+        "codes": [
+          "323"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Скорость на рулении больше рекомендованной",
+        "parameter": "Vgr",
+        "use": "max",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "manual",
+        "reason": "окно события выходит за руление: в тех же строках Vgr доходит до 188 kts, то есть до разбега, и автоматический уровень был бы завышен"
+      }
+    },
+    {
+      "id": "taxi-speed-runway",
+      "name": {
+        "ru": "Скорость на рулении по ВПП более 60 kts",
+        "en": "Taxi Speed Exceedance (RW Taxiing)"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 82,
+        "codes": [
+          "323"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Taxi Speed Exceedance in Straight Line (for RW Taxing)",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "manual",
+        "reason": "уровень задан длительностью (TOL ≥ 2 / 4 с)"
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "taxi-speed-in-turn",
+      "name": {
+        "ru": "Скорость на развороте более 60° при рулении",
+        "en": "Taxi Exceedance in Turn"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 82,
+        "codes": [
+          "323"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Taxi Exceedance in Turn",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "greater",
+        "unit": "kts",
+        "levels": {
+          "2": 15,
+          "3": 18,
+          "4": 22
+        }
+      },
+      "note": "Текст события в выгрузке не встречался."
+    },
+    {
+      "id": "vmo-exceedance-ap-on",
+      "name": {
+        "ru": "Превышена VMO при включённом автопилоте",
+        "en": "VMO Exceedance AP-ON"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 82,
+        "codes": [
+          "153"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "VMO Exceedance AP-ON",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4,
+        "description": "VMO"
+      },
+      "note": "Текст события в выгрузке не встречался; применяется к ВС с версией ПО авионики V601."
+    },
+    {
+      "id": "mmo-exceedance-ap-on",
+      "name": {
+        "ru": "Превышено MMO при включённом автопилоте",
+        "en": "MMO Exceedance AP-ON"
+      },
+      "category": "Speed",
+      "summaryRow": "отклонение по скорости (Vcom, Vgr)",
+      "source": {
+        "page": 82,
+        "codes": [
+          "154"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "MMO Exceedance AP-ON",
+        "patternVerified": false
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4,
+        "description": "MMO"
+      },
+      "note": "Текст события в выгрузке не встречался; применяется к ВС с версией ПО авионики V601."
+    },
+    {
+      "id": "dual-input",
+      "name": {
+        "ru": "Двойное управление без нажатия кнопки приоритета",
+        "en": "DUAL INPUT"
+      },
+      "category": "DualInput",
+      "summaryRow": "двойное управление",
+      "source": {
+        "page": 82,
+        "codes": [
+          "364"
+        ],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Двойное управление самолетом",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "manual",
+        "reason": "уровень задан длительностью двойного отклонения БРУ более 2° (1 с — 2 уровень, 3 с — 3 уровень)"
+      }
+    },
+    {
+      "id": "intensive-braking",
+      "name": {
+        "ru": "Интенсивное торможение на пробеге после посадки",
+        "en": "Intensive Braking after Landing"
+      },
+      "category": "Acceleration",
+      "summaryRow": "интенсивное торможение",
+      "source": {
+        "page": 38,
+        "codes": [],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Интенсивное торможение на пробеге",
+        "parameter": "Nx",
+        "use": "abs",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "manual",
+        "reason": "в приложении № 6 норматив уровней для этого отклонения не задан, хотя в сводной таблице приложения № 5А строка есть"
+      },
+      "note": "Правило добавлено ради строки сводной таблицы: событие в выгрузке есть и встречается часто, порогов по уровням в нормативах нет."
     }
   ]
 }

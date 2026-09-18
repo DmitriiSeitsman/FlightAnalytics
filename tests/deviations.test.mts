@@ -3,7 +3,7 @@ import test from "node:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildDeviationMatrix, DeviationConfigError, normalizeAircraftKey, resolveAircraftRules } from "../app/deviations/config.ts";
+import { buildDeviationMatrix, DeviationConfigError, normalizeAircraftKey, resolveAircraftRules, summaryRows } from "../app/deviations/config.ts";
 
 const configDir = join(dirname(fileURLToPath(import.meta.url)), "..", "config", "deviations");
 
@@ -128,4 +128,26 @@ test("два конфига не могут претендовать на оди
     () => buildDeviationMatrix([{ source: "a.json", data: first }, { source: "b.json", data: second }]),
     (error: unknown) => error instanceof DeviationConfigError && error.issues.some((issue) => issue.includes("уже занят конфигом a.json")),
   );
+});
+
+test("строки сводной таблицы берутся только из приложения № 5А", () => {
+  const matrix = buildDeviationMatrix(realConfigs());
+  for (const rule of matrix.rules) {
+    if (rule.summaryRow === null) continue;
+    assert.ok((summaryRows as readonly string[]).includes(rule.summaryRow), `${rule.key}: строки «${rule.summaryRow}» нет в приложении № 5А`);
+  }
+  const covered = new Set(matrix.rules.map((rule) => rule.summaryRow).filter(Boolean));
+  assert.ok(covered.size >= 10, `матрица наполняет только ${covered.size} строк сводной таблицы из ${summaryRows.length}`);
+
+  const error = broken((config) => { rulesOf(config)[0].summaryRow = "повышенная перегрузка"; });
+  assert.ok(error.issues.some((issue) => issue.includes("приложения № 5А")));
+});
+
+test("правило с ручной оценкой уровня проходит валидацию", () => {
+  const config = baseConfig();
+  rulesOf(config)[0].trigger = { type: "manual", reason: "уровень задан длительностью, её в выгрузке нет" };
+  const matrix = buildDeviationMatrix([{ source: "manual.json", data: config }]);
+  assert.equal(matrix.rules[0].trigger.type, "manual");
+  const error = broken((c) => { rulesOf(c)[0].trigger = { type: "manual" }; });
+  assert.ok(error.issues.some((issue) => issue.includes("trigger.reason")));
 });

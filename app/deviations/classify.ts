@@ -17,6 +17,7 @@ import {
   type DeviationRule,
   type DeviationTrigger,
   type LevelThreshold,
+  type ParameterUse,
 } from "./config.ts";
 
 // Ровно та часть события, которая нужна движку: тип ВС приходит отдельно, из рейса.
@@ -27,6 +28,7 @@ export type ClassificationReason =
   | "occurrence"          // отклонением считается сам факт события
   | "below-threshold"     // правило нашлось, значение ниже 2-го уровня
   | "no-value"            // правило нашлось, но параметра в событии нет
+  | "manual-review"       // уровень по выгрузке не определить, нужна ручная оценка
   | "condition-failed"    // со-условие правила не выполнено
   | "condition-unknown";  // со-условие нечем проверить — параметра в событии нет
 
@@ -68,36 +70,36 @@ export function parseEventNumber(raw: string | null | undefined): number | null 
 
 // Параметр может прийти несколькими строками одного события: берём крайнее значение
 // в нужную сторону. Имя сверяется точно — «Ny» не должен подхватить «Ny16».
-function readParameter(event: ClassifiableEvent, name: string, use: "max" | "min"): number | null {
+// «abs» нужен там, где инструкция сравнивает модуль: крен влево и вертикальная
+// скорость снижения приходят со знаком минус.
+function readParameter(event: ClassifiableEvent, name: string, use: ParameterUse): number | null {
   const wanted = normalizeText(name);
   const values: number[] = [];
   for (const parameter of event.parameters ?? []) {
     if (normalizeText(parameter?.name ?? "") !== wanted) continue;
-    const primary = parseEventNumber(use === "max" ? parameter.max : parameter.min);
-    const fallback = parseEventNumber(use === "max" ? parameter.min : parameter.max);
-    const value = primary ?? fallback;
+    const max = parseEventNumber(parameter.max);
+    const min = parseEventNumber(parameter.min);
+    if (use === "abs") {
+      for (const value of [max, min]) if (value !== null) values.push(Math.abs(value));
+      continue;
+    }
+    const value = use === "max" ? max ?? min : min ?? max;
     if (value !== null) values.push(value);
   }
   if (values.length === 0) return null;
-  return use === "max" ? Math.max(...values) : Math.min(...values);
+  return use === "min" ? Math.min(...values) : Math.max(...values);
 }
 
-// Правило ищется по паре «тип ВС + текст события»: кодов событий выгрузка не заполняет.
-// При нескольких совпадениях выигрывает более длинный (более конкретный) образец.
-export function findRule(event: ClassifiableEvent, aircraftType: string, matrix: DeviationMatrix): DeviationRule | null {
-  const set = resolveAircraftRules(matrix, aircraftType);
-  if (!set) return null;
-  const text = normalizeText(event.text ?? "");
-  if (!text) return null;
-  let best: { rule: DeviationRule; weight: number } | null = null;
-  for (const rule of set.rules) {
-    if (rule.match.kind !== "event") continue;
-    const needle = normalizeText(rule.match.textContains);
-    if (!needle || !text.includes(needle)) continue;
-    const weight = needle.length;
-    if (!best || weight > best.weight || (weight === best.weight && rule.id < best.rule.id)) best = { rule, weight };
+type ConditionState = { ok: true } | { ok: false; reason: "condition-failed" | "condition-unknown"; condition: DeviationCondition };
+
+function evaluateConditions(rule: DeviationRule, event: ClassifiableEvent): ConditionState {
+  for (const condition of rule.conditions) {
+    const use: ParameterUse = condition.use ?? (condition.compare === "less" || condition.compare === "lessOrEqual" ? "min" : "max");
+    const value = readParameter(event, condition.parameter, use);
+    if (value === null) return { ok: false, reason: "condition-unknown", condition };
+    if (!compareValue(value, condition.compare, condition.value)) return { ok: false, reason: "condition-failed", condition };
   }
-  return best?.rule ?? null;
+  return { ok: true };
 }
 
 function levelFromLadder(ladder: LevelThreshold[], value: number): DeviationLevel | null {
@@ -109,30 +111,74 @@ function levelFromLadder(ladder: LevelThreshold[], value: number): DeviationLeve
   return level;
 }
 
-export function classifyEvent(event: ClassifiableEvent, aircraftType: string, matrix: DeviationMatrix): DeviationClassification | null {
-  const rule = findRule(event, aircraftType, matrix);
-  if (!rule) return null;
+function evaluate(rule: DeviationRule, event: ClassifiableEvent, conditions: ConditionState): DeviationClassification {
   const parameter = rule.match.kind === "event" ? rule.match.parameter : null;
   const use = rule.match.kind === "event" ? rule.match.use : "max";
   const value = parameter ? readParameter(event, parameter, use) : null;
   const unit = rule.trigger.type === "threshold" ? rule.trigger.unit : null;
   const base = { rule, parameter, value, unit, failedCondition: null };
-
-  for (const condition of rule.conditions) {
-    const conditionValue = readParameter(event, condition.parameter, condition.compare === "less" || condition.compare === "lessOrEqual" ? "min" : "max");
-    if (conditionValue === null) return { ...base, level: null, reason: "condition-unknown", failedCondition: condition };
-    if (!compareValue(conditionValue, condition.compare, condition.value)) return { ...base, level: null, reason: "condition-failed", failedCondition: condition };
-  }
-
+  if (!conditions.ok) return { ...base, level: null, reason: conditions.reason, failedCondition: conditions.condition };
   if (rule.trigger.type === "occurrence") return { ...base, level: rule.trigger.level, reason: "occurrence" };
+  if (rule.trigger.type === "manual") return { ...base, level: null, reason: "manual-review" };
   if (value === null) return { ...base, level: null, reason: "no-value" };
   const level = levelFromLadder(rule.trigger.ladder, value);
   return { ...base, level, reason: level === null ? "below-threshold" : "threshold" };
 }
 
+const reasonRank: Record<ClassificationReason, number> = {
+  threshold: 0,
+  occurrence: 0,
+  "manual-review": 0,
+  "below-threshold": 1,
+  "no-value": 2,
+  "condition-failed": 3,
+  "condition-unknown": 3,
+};
+
+// Одно событие может отвечать нескольким нормативам: «Грубая посадка» несёт и Ny,
+// и VyHg — в сводной таблице это разные строки. Поэтому кандидаты группируются по
+// параметру, и внутри группы остаётся один, самый подходящий: сперва тот, чьи
+// со-условия выполнены (так различаются полосы высот), затем — с более длинным,
+// то есть более конкретным образцом текста.
+export function classifyEventAll(event: ClassifiableEvent, aircraftType: string, matrix: DeviationMatrix): DeviationClassification[] {
+  const set = resolveAircraftRules(matrix, aircraftType);
+  if (!set) return [];
+  const text = normalizeText(event?.text ?? "");
+  if (!text) return [];
+  const best = new Map<string, { rule: DeviationRule; weight: number; conditions: ConditionState }>();
+  for (const rule of set.rules) {
+    if (rule.match.kind !== "event") continue;
+    const needle = normalizeText(rule.match.textContains);
+    if (!needle || !text.includes(needle)) continue;
+    const key = rule.match.parameter ? normalizeText(rule.match.parameter) : "";
+    const candidate = { rule, weight: needle.length, conditions: evaluateConditions(rule, event) };
+    const current = best.get(key);
+    if (!current || preferred(candidate, current)) best.set(key, candidate);
+  }
+  return [...best.values()]
+    .map((candidate) => evaluate(candidate.rule, event, candidate.conditions))
+    .sort((a, b) => (b.level ?? 0) - (a.level ?? 0) || reasonRank[a.reason] - reasonRank[b.reason] || a.rule.id.localeCompare(b.rule.id));
+}
+
+function preferred(candidate: { rule: DeviationRule; weight: number; conditions: ConditionState }, current: { rule: DeviationRule; weight: number; conditions: ConditionState }): boolean {
+  if (candidate.conditions.ok !== current.conditions.ok) return candidate.conditions.ok;
+  if (candidate.weight !== current.weight) return candidate.weight > current.weight;
+  return candidate.rule.id < current.rule.id;
+}
+
+// Самое тяжёлое из отклонений события — то, что показывается в карточке и в бейдже.
+export function classifyEvent(event: ClassifiableEvent, aircraftType: string, matrix: DeviationMatrix): DeviationClassification | null {
+  return classifyEventAll(event, aircraftType, matrix)[0] ?? null;
+}
+
+export function findRule(event: ClassifiableEvent, aircraftType: string, matrix: DeviationMatrix): DeviationRule | null {
+  return classifyEvent(event, aircraftType, matrix)?.rule ?? null;
+}
+
 // «≥ 1.76 / ≥ 1.81 / > 2 g» — для подсказок в интерфейсе и отчёта покрытия.
 export function describeTrigger(trigger: DeviationTrigger): string {
   if (trigger.type === "occurrence") return `сам факт события — ${trigger.level} уровень`;
+  if (trigger.type === "manual") return `уровень вручную: ${trigger.reason}`;
   const steps = trigger.ladder.map((step) => `${compareSigns[step.compare]} ${step.value}`).join(" / ");
   return trigger.unit ? `${steps} ${trigger.unit}` : steps;
 }
