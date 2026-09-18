@@ -722,3 +722,40 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 @media (max-width:1000px) { .report-metric-grid { grid-template-columns:repeat(2,minmax(160px,1fr)); } }
 @media (max-width:800px) { .privacy { display:none; }.hero { padding-bottom:62px; }.hero-copy { margin-top:54px; }.feature-grid,.result-strip,.filters,.pilot-controls,.stats-controls,.stats-callout,.export-row,.comparison-picker-fields { grid-template-columns:1fr; }.export-row { flex-direction:column; align-items:stretch; }.result-strip p { text-align:left; }.workspace { width:min(100% - 24px,1460px); }.upload { justify-content:flex-start; }.processing { grid-template-columns:1fr; gap:18px; padding:24px 18px; }.processing-visual { width:104px; height:104px; }.processing-copy { grid-template-columns:1fr auto; }.processing ol { grid-template-columns:repeat(2,1fr); }.mobile-table-hint { display:block; margin-top:7px; color:var(--navy); font-weight:800; }.table-shell { border-radius:13px; }.table-shell th:first-child { box-shadow:8px 0 14px -14px #10274080; }.chart-head,.chart-legend { flex-direction:column; }.stats-participants article+article { border-left:0; border-top-width:4px; }.comparison-chip { width:100%; max-width:none; }.chart-card { padding-inline:14px; }.comparison-picker { padding:16px; }.report-settings-head { flex-direction:column; }.report-settings-head>div:last-child { width:100%; }.report-settings-head button { flex:1; }.report-metric-grid { grid-template-columns:1fr; } }
 @media (prefers-reduced-motion:reduce) { .mini-spinner,.processing-ring { animation-duration:2.5s; }.progress-track span,.upload { transition:none; } }
+
+/* Уровни отклонений по матрице нормативов (приложение № 6). */
+.deviation-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border: 1px solid;
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.deviation-badges { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.deviation-none { color: #97a4ad; font-size: 11px; }
+
+.events-level-grid { margin-top: -8px; }
+
+.flight-detail-event-marks { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+
+.flight-detail-event-rule {
+  margin: 0;
+  font-size: 10px;
+  color: #63717d;
+}
+
+.fd-level-counts { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-left: 10px; }
+
+.fd-level-count {
+  padding: 2px 8px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}

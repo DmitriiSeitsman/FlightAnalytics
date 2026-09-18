@@ -2,6 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { type Event, type EventColor, type Flight, shortenPilotName } from "./flight-data";
+import { classifyEventAll, type DeviationClassification } from "./deviations/classify";
+import { deviationMatrix } from "./deviations/registry";
+import { DeviationBadge } from "./deviations/badge";
+import { displayDeviation, levelFilterOf, LEVEL_FILTERS, LEVEL_FILTER_LABELS, LEVEL_FILTER_STYLES, type LevelFilter } from "./deviations/presentation";
 
 interface EventsAnalyticsProps {
   flights: Flight[];
@@ -34,7 +38,15 @@ export const COLOR_STYLES: Record<EventColor, { bg: string; text: string; border
 export function EventsAnalytics({ flights, events, aircraftFilter, airportFilter }: EventsAnalyticsProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedColors, setSelectedColors] = useState<EventColor[]>([]);
+  const [selectedLevels, setSelectedLevels] = useState<LevelFilter[]>([]);
   const eventsPerPage = 50;
+
+  const toggleLevel = (level: LevelFilter) => {
+    setSelectedLevels((current) =>
+      current.includes(level) ? current.filter((item) => item !== level) : [...current, level]
+    );
+    setCurrentPage(1);
+  };
 
   const toggleColor = (color: EventColor) => {
     setSelectedColors((current) =>
@@ -45,6 +57,11 @@ export function EventsAnalytics({ flights, events, aircraftFilter, airportFilter
 
   const clearColorFilter = () => {
     setSelectedColors([]);
+    setCurrentPage(1);
+  };
+
+  const clearLevelFilter = () => {
+    setSelectedLevels([]);
     setCurrentPage(1);
   };
 
@@ -74,6 +91,33 @@ export function EventsAnalytics({ flights, events, aircraftFilter, airportFilter
     
     return resultEvents;
   }, [filteredFlights]);
+
+  // Уровень отклонения зависит от типа ВС, а он известен только по рейсу.
+  const deviationsByEvent = useMemo(() => {
+    const aircraftByEvent = new Map<string, string>();
+    for (const flight of filteredFlights) {
+      for (const event of flight.events ?? []) {
+        if (!aircraftByEvent.has(event.id)) aircraftByEvent.set(event.id, flight.aircraftType);
+      }
+    }
+    const classified = new Map<string, DeviationClassification[]>();
+    for (const event of allEvents) {
+      classified.set(event.id, classifyEventAll(event, aircraftByEvent.get(event.id) ?? "", deviationMatrix));
+    }
+    return classified;
+  }, [filteredFlights, allEvents]);
+
+  const levelOfEvent = useMemo(() => {
+    const levels = new Map<string, LevelFilter>();
+    for (const [id, classifications] of deviationsByEvent) levels.set(id, levelFilterOf(classifications));
+    return levels;
+  }, [deviationsByEvent]);
+
+  const levelStats = useMemo(() => {
+    const counts = new Map<LevelFilter, number>();
+    for (const level of levelOfEvent.values()) counts.set(level, (counts.get(level) ?? 0) + 1);
+    return LEVEL_FILTERS.map((level) => ({ level, label: LEVEL_FILTER_LABELS[level], count: counts.get(level) ?? 0, style: LEVEL_FILTER_STYLES[level] }));
+  }, [levelOfEvent]);
 
   const eventsByColor = useMemo(() => {
     const grouped: Record<EventColor, Event[]> = {
@@ -105,9 +149,12 @@ export function EventsAnalytics({ flights, events, aircraftFilter, airportFilter
 
   // Фильтруем по выбранным цветам
   const filteredEvents = useMemo(() => {
-    if (!selectedColors.length) return sortedEvents;
-    return sortedEvents.filter((event) => selectedColors.includes(event.color));
-  }, [sortedEvents, selectedColors]);
+    return sortedEvents.filter((event) => {
+      if (selectedColors.length && !selectedColors.includes(event.color)) return false;
+      if (selectedLevels.length && !selectedLevels.includes(levelOfEvent.get(event.id) ?? "unmatched")) return false;
+      return true;
+    });
+  }, [sortedEvents, selectedColors, selectedLevels, levelOfEvent]);
 
   // Пагинация
   const totalPages = Math.ceil(filteredEvents.length / eventsPerPage);
@@ -163,6 +210,39 @@ export function EventsAnalytics({ flights, events, aircraftFilter, airportFilter
         })}
       </div>
 
+      <div className="events-stats-grid events-level-grid">
+        {levelStats.map((stat) => {
+          const isSelected = selectedLevels.includes(stat.level);
+          const isDimmed = selectedLevels.length > 0 && !isSelected;
+          return (
+            <button
+              key={stat.level}
+              type="button"
+              className={`event-stat-card${isSelected ? " event-stat-card-active" : ""}`}
+              aria-pressed={isSelected}
+              onClick={() => toggleLevel(stat.level)}
+              style={{
+                background: stat.style.bg,
+                borderColor: isSelected ? stat.style.text : stat.style.border,
+                opacity: isDimmed ? 0.5 : 1,
+              }}
+            >
+              <span style={{ color: stat.style.text }}>{stat.label}</span>
+              <strong style={{ color: stat.style.text }}>{stat.count}</strong>
+            </button>
+          );
+        })}
+      </div>
+
+      {selectedLevels.length > 0 && (
+        <div className="events-filter-bar">
+          <span>Уровень: {selectedLevels.map((level) => LEVEL_FILTER_LABELS[level]).join(", ")}</span>
+          <button type="button" className="events-filter-reset" onClick={clearLevelFilter}>
+            Сбросить фильтр
+          </button>
+        </div>
+      )}
+
       {selectedColors.length > 0 && (
         <div className="events-filter-bar">
           <span>
@@ -177,13 +257,14 @@ export function EventsAnalytics({ flights, events, aircraftFilter, airportFilter
       <div className="events-table-container">
         <h3>Все события ({filteredEvents.length})</h3>
         {filteredEvents.length === 0 ? (
-          <p className="events-analytics-empty-filter">Нет событий выбранного цвета.</p>
+          <p className="events-analytics-empty-filter">Нет событий, подходящих под фильтр.</p>
         ) : (
         <div className="table-shell">
           <table className="events-table">
             <thead>
               <tr>
                 <th>Цвет</th>
+                <th>Уровень</th>
                 <th>Событие</th>
                 <th>Пилот</th>
                 <th>Роль</th>
@@ -208,6 +289,14 @@ export function EventsAnalytics({ flights, events, aircraftFilter, airportFilter
                         }}
                       >
                         {COLOR_LABELS[event.color]}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="deviation-badges">
+                        {(deviationsByEvent.get(event.id) ?? []).map((classification) => (
+                          <DeviationBadge key={classification.rule.key} display={displayDeviation(classification)} />
+                        ))}
+                        {(deviationsByEvent.get(event.id) ?? []).length === 0 && <span className="deviation-none">—</span>}
                       </span>
                     </td>
                     <td>{event.text}</td>

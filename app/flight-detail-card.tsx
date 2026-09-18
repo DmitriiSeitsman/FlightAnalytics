@@ -2,6 +2,10 @@
 
 import { formatFlightDate, formatMetric, metricDefinitions, violatesLimit, type Flight, type Metrics } from "./flight-data";
 import { COLOR_LABELS, COLOR_STYLES } from "./events-analytics";
+import { classifyEventAll } from "./deviations/classify";
+import { deviationMatrix } from "./deviations/registry";
+import { DeviationBadge } from "./deviations/badge";
+import { deviationSummary, displayDeviation, LEVEL_STYLES, worstLevel } from "./deviations/presentation";
 
 // Диапазон по типу ВС для этого рейса: минимум, среднее и максимум по каждому показателю.
 export type FlightTypeSummary = { metrics: Metrics; minMetrics: Metrics; maxMetrics: Metrics };
@@ -34,6 +38,14 @@ function MetricRange({ value, min, max, avg, alert }: { value: number; min: numb
 
 export function FlightDetailCard({ flight, onClose, positions, typeSummary, onSelectPilot }: FlightDetailCardProps) {
   const identity = [formatFlightDate(flight.date), flight.aircraftType, flight.board].filter(Boolean).join(" · ");
+  // Уровни отклонений по матрице нормативов: одно событие может отвечать сразу двум нормативам.
+  const deviations = flight.events.map((event) => classifyEventAll(event, flight.aircraftType, deviationMatrix));
+  const levelCounts = new Map<number, number>();
+  for (const classifications of deviations) {
+    const level = worstLevel(classifications);
+    if (level !== null) levelCounts.set(level, (levelCounts.get(level) ?? 0) + 1);
+  }
+  const levels = [4, 3, 2].filter((level) => levelCounts.has(level));
 
   return (
     <div className="pilot-card-overlay">
@@ -122,21 +134,49 @@ export function FlightDetailCard({ flight, onClose, positions, typeSummary, onSe
           </section>
 
           <section>
-            <h3 className="fd-block-title">События · {flight.events.length}</h3>
+            <h3 className="fd-block-title">
+              События · {flight.events.length}
+              {levels.length > 0 && (
+                <span className="fd-level-counts">
+                  {levels.map((level) => (
+                    <span
+                      key={level}
+                      className="fd-level-count"
+                      style={{ background: LEVEL_STYLES[level as 2 | 3 | 4].bg, color: LEVEL_STYLES[level as 2 | 3 | 4].text, borderColor: LEVEL_STYLES[level as 2 | 3 | 4].border }}
+                    >
+                      {level} уровень — {levelCounts.get(level)}
+                    </span>
+                  ))}
+                </span>
+              )}
+            </h3>
             {flight.events.length === 0 ? (
               <p className="pilot-card-empty">Событий не зафиксировано</p>
             ) : (
               <ul className="flight-detail-events">
-                {flight.events.map((event) => (
-                  <li key={event.id} className="flight-detail-event" style={{ borderLeftColor: COLOR_STYLES[event.color].text }}>
-                    <span
-                      className="event-color-badge"
-                      style={{ background: COLOR_STYLES[event.color].bg, color: COLOR_STYLES[event.color].text, borderColor: COLOR_STYLES[event.color].border }}
-                    >
-                      {COLOR_LABELS[event.color]}
-                    </span>
+                {flight.events.map((event, eventIndex) => {
+                  const classifications = deviations[eventIndex];
+                  const level = worstLevel(classifications);
+                  // Полоса слева — по уровню отклонения, если он известен; иначе по цвету из выгрузки.
+                  const accent = level === null ? COLOR_STYLES[event.color].text : LEVEL_STYLES[level].text;
+                  return (
+                  <li key={event.id} className="flight-detail-event" style={{ borderLeftColor: accent }}>
+                    <div className="flight-detail-event-marks">
+                      <span
+                        className="event-color-badge"
+                        style={{ background: COLOR_STYLES[event.color].bg, color: COLOR_STYLES[event.color].text, borderColor: COLOR_STYLES[event.color].border }}
+                      >
+                        {COLOR_LABELS[event.color]}
+                      </span>
+                      {classifications.map((classification) => (
+                        <DeviationBadge key={classification.rule.key} display={displayDeviation(classification)} />
+                      ))}
+                    </div>
                     <div className="flight-detail-event-body">
                       <p>{event.text}</p>
+                      {classifications.map((classification) => (
+                        <p className="flight-detail-event-rule" key={classification.rule.key}>{deviationSummary(classification)}</p>
+                      ))}
                       {(event.phase || event.duration) && (
                         <div className="flight-detail-event-meta">
                           {event.phase && <span>Фаза: {event.phase}</span>}
@@ -152,7 +192,8 @@ export function FlightDetailCard({ flight, onClose, positions, typeSummary, onSe
                       )}
                     </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </section>
