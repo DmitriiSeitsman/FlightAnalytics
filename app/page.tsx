@@ -151,7 +151,7 @@ export default function Home() {
   const aircraftTypes = useMemo(() => [...new Set(result?.flights.map((item) => item.aircraftType) ?? [])].sort(), [result]);
   const airports = useMemo(() => [...new Set(result?.flights.flatMap((item) => [item.departure, item.arrival]) ?? [])].sort(), [result]);
   const flights = useMemo(() => (result?.flights ?? []).filter((flight) => (!aircraftType || flight.aircraftType === aircraftType) && (!airport || flight.departure === airport || flight.arrival === airport)), [aircraftType, airport, result]);
-  const summaries = useMemo(() => view === "pilots" || view === "statistics" || view === "events" || view === "flights" ? [] : summarizeFlights(flights, view), [flights, view]);
+  const summaries = useMemo(() => view === "pilots" || view === "statistics" || view === "events" || view === "flights" || view === "deviations" ? [] : summarizeFlights(flights, view), [flights, view]);
   const positions = useMemo(() => derivePositions(result?.flights ?? []), [result]);
   const pilotSummaries = useMemo(() => summarizePilots(flights, positions).filter((pilot) => pilot.flights >= minimumFlights), [flights, positions, minimumFlights]);
   const pilots = useMemo(() => groupPilotRows(pilotSummaries).filter((row) => !pilotSearch || `${row.name} ${row.code}`.toLocaleLowerCase("ru-RU").includes(pilotSearch.toLocaleLowerCase("ru-RU"))), [pilotSummaries, pilotSearch]);

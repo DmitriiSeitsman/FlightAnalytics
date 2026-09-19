@@ -760,26 +760,109 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
   text-transform: none;
 }
 
-/* Вкладка «Отклонения»: сводная таблица приложения 5А и список отклонений. */
-.deviations-view { display: flex; flex-direction: column; gap: 28px; }
-.deviation-summary h3, .deviation-list h3 { margin: 0 0 8px; font-size: 14px; }
+/* Вкладка «Отклонения»: сводная таблица приложения 5А, бланк учёта и список. */
+.deviations-view { display: flex; flex-direction: column; gap: 32px; }
 
-.summary-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-.summary-table th, .summary-table td { padding: 6px 8px; border-bottom: 1px solid #e5e9ea; text-align: center; }
-.summary-table thead th { background: #f6f8f9; font-size: 10px; font-weight: 700; white-space: nowrap; }
-.summary-table th.summary-base { font-weight: 600; color: #63717d; }
-.summary-table tbody th { text-align: left; font-weight: 600; white-space: nowrap; }
+.deviation-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+.deviation-section-head h3 { margin: 0 0 4px; font-size: 14px; }
+.deviation-section-head .note { margin: 0; max-width: 78ch; }
+
+.deviation-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.deviation-toggle input { accent-color: #183964; }
+
+.summary-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.summary-table th, .summary-table td { padding: 7px 9px; border-bottom: 1px solid #e5e9ea; text-align: center; }
+.summary-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f1f5f6;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  border-bottom: 1px solid #d7dee1;
+}
+.summary-table thead tr:first-child th + th ~ th { border-left: 1px solid #d7dee1; }
+.summary-table th.summary-base { font-weight: 600; color: #63717d; font-size: 9px; }
+.summary-table tbody th { text-align: left; font-weight: 600; }
+
+/* Первые две колонки не уезжают при горизонтальной прокрутке. */
+.summary-table thead tr:first-child th:first-child,
+.summary-table th.summary-row-title {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: 232px;
+  background: white;
+  box-shadow: 1px 0 0 #e5e9ea;
+}
+.summary-table thead tr:first-child th:first-child { background: #f1f5f6; z-index: 4; }
+.summary-table thead tr:first-child th:nth-child(2),
+.summary-table td.summary-level {
+  position: sticky;
+  left: 232px;
+  z-index: 1;
+  min-width: 92px;
+  background: white;
+  box-shadow: 1px 0 0 #e5e9ea;
+}
+.summary-table thead tr:first-child th:nth-child(2) { background: #f1f5f6; z-index: 4; }
+.summary-table th.summary-row-title[colspan] { left: 0; min-width: 324px; }
+
 .summary-table td b { font-weight: 700; }
 .summary-table td small { color: #8b98a2; }
-.summary-zero { color: #c3ccd2; }
-.summary-empty-row { opacity: 0.55; }
+.summary-zero { color: #ccd5da; }
+.summary-empty-row { color: #9aa7b0; }
+.summary-group-start > * { border-top: 1px solid #d7dee1; }
 .summary-level span { display: inline-block; padding: 2px 8px; border: 1px solid; border-radius: 999px; font-size: 9px; font-weight: 700; white-space: nowrap; }
-.summary-total-row { background: #fbfcfc; }
+.summary-total-row { background: #f7fafb; }
 .summary-total-row th, .summary-total-row td { font-weight: 700; }
+.summary-total-row th.summary-row-title, .summary-total-row td.summary-level { background: #f7fafb; }
 .summary-extra-row th { color: #4d5a64; }
 
+.deviation-report-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fbfcfc;
+}
+.deviation-report-controls label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
+.deviation-report-controls label span { color: #63717d; font-weight: 600; }
+.deviation-report-controls select { padding: 8px 10px; border: 1px solid #c7d1d8; border-radius: 8px; background: white; font-size: 12px; }
+.deviation-report-summary { display: flex; flex-direction: column; gap: 4px; margin-right: auto; font-size: 11px; }
+.deviation-report-summary span { color: #63717d; font-weight: 600; }
+.deviation-report-summary strong { font-size: 13px; }
+
+.deviations-table td { vertical-align: top; }
 .deviations-table td small { display: block; color: #8b98a2; font-size: 10px; }
-.deviations-table .deviation-rule { margin-top: 2px; color: #63717d; }
+.deviations-table .deviation-rule { margin-top: 3px; color: #63717d; }
 .deviation-crew b { color: #4d5a64; }
 .deviation-row { cursor: pointer; }
 .deviation-row:hover { background: #f2f7fa; }
+.deviation-row:hover td:first-child { box-shadow: inset 2px 0 0 #183964; }

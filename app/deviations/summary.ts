@@ -28,12 +28,14 @@ export function collectDeviations(flights: Flight[], matrix: DeviationMatrix): D
   return entries;
 }
 
+// Порядок колонок — не как в бланке, а как удобно смотреть: A-319/320 и RRJ-95
+// слева, потому что по ним основной парк и основная работа с отклонениями.
 export const aircraftColumns = [
+  { key: "a319320", label: "A-319/320", pattern: /a-?3(19|20)|airbus3(19|20)/ },
+  { key: "rrj95", label: "RRJ-95", pattern: /rrj/ },
   { key: "738", label: "738", pattern: /737/ },
   { key: "773", label: "773", pattern: /777/ },
   { key: "744", label: "744", pattern: /747/ },
-  { key: "a319320", label: "A-319/320", pattern: /a-?3(19|20)|airbus3(19|20)/ },
-  { key: "rrj95", label: "RRJ-95", pattern: /rrj/ },
 ] as const;
 export const OTHER_COLUMN = "other";
 

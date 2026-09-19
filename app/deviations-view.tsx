@@ -8,7 +8,8 @@ import { DeviationBadge } from "./deviations/badge";
 import { detachmentConfig, deviationMatrix } from "./deviations/registry";
 import { deviationSummary, displayDeviation, LEVEL_STYLES } from "./deviations/presentation";
 import { ALL_BASES, buildSummaryTable, cellKey, collectDeviations, type DeviationEntry, type SummaryCell, type SummaryColumn } from "./deviations/summary";
-import { flightBases } from "./deviations/detachments";
+import { commanderDetachment, flightBases } from "./deviations/detachments";
+import { buildLevel4Report, downloadLevel4Excel, downloadLevel4Pdf } from "./deviations/report";
 
 interface DeviationsViewProps {
   flights: Flight[];
@@ -53,6 +54,8 @@ function RowCells({ columns, cells }: { columns: SummaryColumn[]; cells: Map<str
 export function DeviationsView({ flights, positions, onSelectPilot }: DeviationsViewProps) {
   const [selectedLevels, setSelectedLevels] = useState<LevelKey[]>([]);
   const [search, setSearch] = useState("");
+  const [showEmptyRows, setShowEmptyRows] = useState(false);
+  const [reportDetachment, setReportDetachment] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null);
   const perPage = 50;
@@ -72,6 +75,20 @@ export function DeviationsView({ flights, positions, onSelectPilot }: Deviations
   }, [flights]);
 
   const summary = useMemo(() => buildSummaryTable(flights, entries, detachmentConfig), [flights, entries]);
+
+  const detachments = useMemo(() => {
+    const found = new Set<string>();
+    for (const flight of flights) {
+      const detachment = commanderDetachment(flight.detachment ?? "");
+      if (detachment) found.add(detachment);
+    }
+    return [...found].sort();
+  }, [flights]);
+
+  const level4Report = useMemo(
+    () => buildLevel4Report(entries, { detachment: reportDetachment || null }),
+    [entries, reportDetachment],
+  );
 
   const levelStats = useMemo(() => {
     const counts = new Map<LevelKey, number>();
@@ -119,10 +136,18 @@ export function DeviationsView({ flights, positions, onSelectPilot }: Deviations
   return (
     <div className="deviations-view">
       <section className="deviation-summary">
-        <h3>Сводная таблица выявленных Отклонений</h3>
-        <p className="note">
-          Приложение № 5А инструкции. В ячейке — число рейсов с отклонением; если событий больше, второе число показывает их. База рейса — по лётному отряду командира.
-        </p>
+        <div className="deviation-section-head">
+          <div>
+            <h3>Сводная таблица выявленных Отклонений</h3>
+            <p className="note">
+              Приложение № 5А инструкции. В ячейке — число рейсов с отклонением; если событий больше, второе число показывает их. База рейса — по лётному отряду командира.
+            </p>
+          </div>
+          <label className="deviation-toggle">
+            <input type="checkbox" checked={showEmptyRows} onChange={(event) => setShowEmptyRows(event.target.checked)} />
+            <span>Показывать пустые строки</span>
+          </label>
+        </div>
         <div className="table-shell">
           <table className="summary-table">
             <thead>
@@ -139,9 +164,9 @@ export function DeviationsView({ flights, positions, onSelectPilot }: Deviations
               </tr>
             </thead>
             <tbody>
-              {summary.rows.map((row) => row.levels.map((levelRow, index) => (
-                <tr key={`${row.row}-${levelRow.level}`} className={row.total.flights === 0 ? "summary-empty-row" : ""}>
-                  {index === 0 && <th rowSpan={row.levels.length}>{row.row}</th>}
+              {summary.rows.filter((row) => showEmptyRows || row.total.flights > 0).map((row) => row.levels.map((levelRow, index) => (
+                <tr key={`${row.row}-${levelRow.level}`} className={`${row.total.flights === 0 ? "summary-empty-row" : ""}${index === 0 ? " summary-group-start" : ""}`}>
+                  {index === 0 && <th rowSpan={row.levels.length} className="summary-row-title">{row.row}</th>}
                   <td className="summary-level">
                     <span style={{ background: LEVEL_STYLES[levelRow.level].bg, color: LEVEL_STYLES[levelRow.level].text, borderColor: LEVEL_STYLES[levelRow.level].border }}>
                       {levelRow.level} уровень
@@ -151,8 +176,8 @@ export function DeviationsView({ flights, positions, onSelectPilot }: Deviations
                 </tr>
               )))}
               {summary.levelTotals.map((levelRow, index) => (
-                <tr key={`total-${levelRow.level}`} className="summary-total-row">
-                  {index === 0 && <th rowSpan={summary.levelTotals.length}>Всего отклонений</th>}
+                <tr key={`total-${levelRow.level}`} className={`summary-total-row${index === 0 ? " summary-group-start" : ""}`}>
+                  {index === 0 && <th rowSpan={summary.levelTotals.length} className="summary-row-title">Всего отклонений</th>}
                   <td className="summary-level">
                     <span style={{ background: LEVEL_STYLES[levelRow.level].bg, color: LEVEL_STYLES[levelRow.level].text, borderColor: LEVEL_STYLES[levelRow.level].border }}>
                       {levelRow.level} уровень
@@ -163,7 +188,7 @@ export function DeviationsView({ flights, positions, onSelectPilot }: Deviations
               ))}
               {summary.extras.map((row) => (
                 <tr key={row.label} className="summary-extra-row" title={row.hint}>
-                  <th colSpan={2}>{row.label}</th>
+                  <th colSpan={2} className="summary-row-title">{row.label}</th>
                   <RowCells columns={summary.columns} cells={row.cells} />
                 </tr>
               ))}
@@ -173,6 +198,32 @@ export function DeviationsView({ flights, positions, onSelectPilot }: Deviations
         <p className="method">
           Строки СДЭ, НПК и «Всего из ООПИ» бланка не заполняются: в выгрузке нет данных для них. Соответствие отрядов базам задано в config/detachments.json по структуре из CrewPlannerWeb: ЛО 1 и ЛО 5 — Санкт-Петербург, ЛО 2 и ЛО 4 — Москва. Рейсы прочих подразделений (ЛО 3, УТО, СЛТС, учебные АЭ) попадают только в колонку «Все».
         </p>
+      </section>
+
+      <section className="deviation-report">
+        <div className="deviation-section-head">
+          <div>
+            <h3>Приложение № 5 — таблица учёта Отклонений 4 уровня</h3>
+            <p className="note">
+              Бланк со стр. 37 инструкции. Заполняются номер, дата и время полёта, номер рейса и характер отклонения; «Причина», «Выводы» и «Подпись ком. ЛО» остаются пустыми под руку.
+            </p>
+          </div>
+        </div>
+        <div className="deviation-report-controls">
+          <label>
+            <span>Лётный отряд</span>
+            <select value={reportDetachment} onChange={(event) => setReportDetachment(event.target.value)}>
+              <option value="">Все отряды</option>
+              {detachments.map((detachment) => <option key={detachment} value={detachment}>{detachment}</option>)}
+            </select>
+          </label>
+          <div className="deviation-report-summary">
+            <span>В отчёте</span>
+            <strong>{level4Report.rows.length} отклонений 4 уровня</strong>
+          </div>
+          <button type="button" className="pagination-button" onClick={() => void downloadLevel4Pdf(level4Report)}>Скачать PDF</button>
+          <button type="button" className="pagination-button" onClick={() => void downloadLevel4Excel(level4Report)}>Скачать Excel</button>
+        </div>
       </section>
 
       <section className="deviation-list">
