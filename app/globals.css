@@ -866,3 +866,5 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 .deviation-row { cursor: pointer; }
 .deviation-row:hover { background: #f2f7fa; }
 .deviation-row:hover td:first-child { box-shadow: inset 2px 0 0 #183964; }
+
+.deviation-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }

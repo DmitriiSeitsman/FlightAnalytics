@@ -9,7 +9,7 @@ import { detachmentConfig, deviationMatrix } from "./deviations/registry";
 import { deviationSummary, displayDeviation, LEVEL_STYLES } from "./deviations/presentation";
 import { ALL_BASES, buildSummaryTable, cellKey, collectDeviations, type DeviationEntry, type SummaryCell, type SummaryColumn } from "./deviations/summary";
 import { commanderDetachment, flightBases } from "./deviations/detachments";
-import { buildLevel4Report, downloadLevel4Excel, downloadLevel4Pdf } from "./deviations/report";
+import { buildLevel4Report, downloadLevel4Excel, downloadLevel4Pdf, downloadSummaryExcel } from "./deviations/report";
 
 interface DeviationsViewProps {
   flights: Flight[];
@@ -75,6 +75,12 @@ export function DeviationsView({ flights, positions, onSelectPilot }: Deviations
   }, [flights]);
 
   const summary = useMemo(() => buildSummaryTable(flights, entries, detachmentConfig), [flights, entries]);
+
+  // Период выборки — по фактическим датам первого и последнего рейса.
+  const period = useMemo(() => {
+    const dates = flights.map((flight) => normalizeFlightDate(flight.date)).filter((date): date is string => Boolean(date)).sort();
+    return { from: dates[0] ?? null, to: dates[dates.length - 1] ?? null };
+  }, [flights]);
 
   const detachments = useMemo(() => {
     const found = new Set<string>();
@@ -143,10 +149,19 @@ export function DeviationsView({ flights, positions, onSelectPilot }: Deviations
               Приложение № 5А инструкции. В ячейке — число рейсов с отклонением; если событий больше, второе число показывает их. База рейса — по лётному отряду командира.
             </p>
           </div>
-          <label className="deviation-toggle">
-            <input type="checkbox" checked={showEmptyRows} onChange={(event) => setShowEmptyRows(event.target.checked)} />
-            <span>Показывать пустые строки</span>
-          </label>
+          <div className="deviation-head-actions">
+            <label className="deviation-toggle">
+              <input type="checkbox" checked={showEmptyRows} onChange={(event) => setShowEmptyRows(event.target.checked)} />
+              <span>Показывать пустые строки</span>
+            </label>
+            <button
+              type="button"
+              className="pagination-button"
+              onClick={() => void downloadSummaryExcel(summary, { periodFrom: period.from, periodTo: period.to })}
+            >
+              Скачать сводку в Excel
+            </button>
+          </div>
         </div>
         <div className="table-shell">
           <table className="summary-table">

@@ -5,7 +5,8 @@ import type { Content, TDocumentDefinitions } from "pdfmake/interfaces";
 import { formatFlightDate } from "../flight-data.ts";
 import { commanderDetachment } from "./detachments.ts";
 import { measuredValue } from "./presentation.ts";
-import type { DeviationEntry } from "./summary.ts";
+import { ALL_BASES, cellKey, type DeviationEntry, type SummaryCell, type SummaryTable } from "./summary.ts";
+import { flightBases } from "./detachments.ts";
 
 export type Level4Row = {
   index: number;
@@ -231,4 +232,138 @@ export async function downloadLevel4Excel(report: Level4Report) {
   const workbook = await buildLevel4Workbook(report);
   const buffer = await workbook.xlsx.writeBuffer();
   downloadBlob(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `otkloneniya-4-urovnya-${fileStamp(report.generatedAt)}.xlsx`);
+}
+
+// ─── Приложение № 5А: сводная таблица выявленных Отклонений (стр. 38) ───────────
+
+export type SummaryExportOptions = {
+  periodFrom: string | null;
+  periodTo: string | null;
+  generatedAt?: Date;
+};
+
+// Строки бланка, для которых в выгрузке нет данных: печатаются пустыми под руку.
+const UNFILLED_ROWS = ["СДЭ", "НПК", "Всего из ООПИ", "Уходы на 2-ой круг при НЗ"];
+const BASE_LABELS = [...flightBases, "Все"];
+const baseKeys = [...flightBases, ALL_BASES];
+
+function summarySheetRows(summary: SummaryTable, pick: (cell: SummaryCell) => number) {
+  const columns = [...summary.columns, { key: "total", label: "всего по а/к" }];
+  const values = (cells: Map<string, SummaryCell>) =>
+    columns.flatMap((column) => baseKeys.map((base) => pick(cells.get(cellKey(column.key, base)) ?? { flights: 0, events: 0 })));
+  return { columns, values };
+}
+
+export async function buildSummaryWorkbook(summary: SummaryTable, options: SummaryExportOptions) {
+  const ExcelJS = unwrap<typeof import("exceljs")>(await import("exceljs"));
+  const generatedAt = options.generatedAt ?? new Date();
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Flight Analytics";
+  workbook.created = generatedAt;
+
+  const periodText = `За период с ${humanDate(options.periodFrom)} по ${humanDate(options.periodTo)}`;
+
+  for (const [name, pick] of [["По рейсам", (cell: SummaryCell) => cell.flights], ["По событиям", (cell: SummaryCell) => cell.events]] as const) {
+    const sheet = workbook.addWorksheet(name);
+    const { columns, values } = summarySheetRows(summary, pick);
+    const width = 2 + columns.length * baseKeys.length;
+    const lastColumn = (index: number) => sheet.getColumn(index).letter;
+    const mergeAcross = (row: number, from: number, to: number) => sheet.mergeCells(`${lastColumn(from)}${row}:${lastColumn(to)}${row}`);
+
+    sheet.getColumn(1).width = 44;
+    sheet.getColumn(2).width = 12;
+    for (let index = 3; index <= width; index += 1) sheet.getColumn(index).width = 9;
+
+    const title = (text: string, options: { bold?: boolean; align?: "center" | "right" } = {}) => {
+      const row = sheet.addRow([text]);
+      mergeAcross(row.number, 1, width);
+      row.getCell(1).font = { bold: options.bold ?? true, size: 12 };
+      row.getCell(1).alignment = { horizontal: options.align ?? "center" };
+      return row;
+    };
+    title("Приложение № 5А", { align: "right", bold: true });
+    title("АО «Авиакомпания «Россия»");
+    title("Сводная таблица выявленных Отклонений");
+    title(periodText, { bold: false });
+    sheet.addRow([]);
+
+    // Шапка в две строки: тип ВС, под ним базы.
+    const typeRow = sheet.addRow(["Вид отклонения", "Уровень", ...columns.flatMap((column) => [column.label, "", ""])]);
+    const baseRow = sheet.addRow(["", "", ...columns.flatMap(() => BASE_LABELS)]);
+    sheet.mergeCells(`A${typeRow.number}:A${baseRow.number}`);
+    sheet.mergeCells(`B${typeRow.number}:B${baseRow.number}`);
+    columns.forEach((_, index) => {
+      const from = 3 + index * baseKeys.length;
+      mergeAcross(typeRow.number, from, from + baseKeys.length - 1);
+    });
+    for (const row of [typeRow, baseRow]) {
+      row.font = { bold: true };
+      row.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEDF2F4" } };
+      });
+    }
+
+    const firstDataRow = baseRow.number + 1;
+    for (const item of summary.rows) {
+      const start = sheet.rowCount + 1;
+      for (const levelRow of item.levels) {
+        sheet.addRow([item.row, `${levelRow.level} уровень`, ...values(levelRow.cells)]);
+      }
+      sheet.mergeCells(`A${start}:A${start + item.levels.length - 1}`);
+      sheet.getCell(`A${start}`).alignment = { vertical: "middle", wrapText: true };
+    }
+
+    const totalsStart = sheet.rowCount + 1;
+    for (const levelRow of summary.levelTotals) {
+      const row = sheet.addRow(["Всего отклонений", `${levelRow.level} уровень`, ...values(levelRow.cells)]);
+      row.font = { bold: true };
+    }
+    sheet.mergeCells(`A${totalsStart}:A${sheet.rowCount}`);
+    sheet.getCell(`A${totalsStart}`).alignment = { vertical: "middle", wrapText: true };
+
+    for (const extra of summary.extras) {
+      const row = sheet.addRow([extra.label, "", ...values(extra.cells)]);
+      mergeAcross(row.number, 1, 2);
+      row.getCell(1).alignment = { wrapText: true };
+    }
+    for (const label of UNFILLED_ROWS) {
+      const row = sheet.addRow([label, "", ...columns.flatMap(() => baseKeys.map(() => null))]);
+      mergeAcross(row.number, 1, 2);
+      row.getCell(1).font = { italic: true, color: { argb: "FF667580" } };
+    }
+
+    for (let number = typeRow.number; number <= sheet.rowCount; number += 1) {
+      const row = sheet.getRow(number);
+      for (let index = 1; index <= width; index += 1) {
+        const cell = row.getCell(index);
+        cell.border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } };
+        if (number >= firstDataRow && index > 2) cell.alignment = { horizontal: "center" };
+      }
+    }
+    sheet.views = [{ state: "frozen", xSplit: 2, ySplit: baseRow.number }];
+  }
+
+  const notes = workbook.addWorksheet("О выгрузке");
+  notes.columns = [{ width: 32 }, { width: 96 }];
+  notes.addRows([
+    ["Отчёт", "Приложение № 5А инструкции И-04.02-28-24, сводная таблица выявленных Отклонений"],
+    ["Период", periodText.replace("За период ", "")],
+    ["Сформировано", generatedAt.toLocaleString("ru-RU")],
+    ["Лист «По рейсам»", "Число рейсов, на которых отклонение выявлено. Один рейс с несколькими событиями одного норматива считается один раз."],
+    ["Лист «По событиям»", "Число событий выгрузки — справочно."],
+    ["База рейса", "Определяется по лётному отряду командира: ЛО 1 и ЛО 5 — СПБ, ЛО 2 и ЛО 4 — МСК. Рейсы прочих подразделений попадают только в колонку «Все»."],
+    ["Пустые строки", `${UNFILLED_ROWS.join(", ")} — в выгрузке нет данных для этих строк бланка.`],
+  ]);
+  notes.getColumn(1).font = { bold: true };
+  notes.getColumn(2).alignment = { wrapText: true, vertical: "top" };
+
+  return workbook;
+}
+
+export async function downloadSummaryExcel(summary: SummaryTable, options: SummaryExportOptions) {
+  const workbook = await buildSummaryWorkbook(summary, options);
+  const buffer = await workbook.xlsx.writeBuffer();
+  const stamp = fileStamp(options.generatedAt ?? new Date());
+  downloadBlob(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `svodnaya-tablica-otkloneniy-${stamp}.xlsx`);
 }

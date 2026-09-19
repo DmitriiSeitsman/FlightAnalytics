@@ -4,8 +4,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildDeviationMatrix } from "../app/deviations/config.ts";
-import { collectDeviations } from "../app/deviations/summary.ts";
-import { buildLevel4Report, buildLevel4PdfDocument, buildLevel4Workbook, REPORT_COLUMNS } from "../app/deviations/report.ts";
+import { buildSummaryTable, collectDeviations } from "../app/deviations/summary.ts";
+import { parseDetachmentConfig } from "../app/deviations/detachments.ts";
+import { buildLevel4Report, buildLevel4PdfDocument, buildLevel4Workbook, buildSummaryWorkbook, REPORT_COLUMNS } from "../app/deviations/report.ts";
 import type { Event, Flight } from "../app/flight-data.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -106,4 +107,38 @@ test("книга Excel повторяет тот же бланк", async () => {
   assert.match(String(sheet.getRow(9).getCell(4).value), /Ny 2,094 g/);
   // Причина, выводы и подпись остаются пустыми.
   for (const column of [5, 6, 7]) assert.equal(String(sheet.getRow(9).getCell(column).value ?? ""), "");
+});
+
+test("сводная таблица выгружается в вёрстке приложения № 5А", async () => {
+  const detachments = parseDetachmentConfig(JSON.parse(readFileSync(join(root, "config", "detachments.json"), "utf8")));
+  const summary = buildSummaryTable(flights, entries, detachments);
+  const workbook = await buildSummaryWorkbook(summary, { periodFrom: "2026-08-03", periodTo: "2026-08-20", generatedAt: new Date("2026-09-19T10:00:00Z") });
+  assert.deepEqual(workbook.worksheets.map((sheet) => sheet.name), ["По рейсам", "По событиям", "О выгрузке"]);
+
+  const sheet = workbook.getWorksheet("По рейсам")!;
+  assert.equal(String(sheet.getCell("A1").value), "Приложение № 5А");
+  assert.equal(String(sheet.getCell("A4").value), "За период с 03.08.2026 по 20.08.2026");
+  // Шапка в две строки: тип ВС и под ним базы.
+  assert.equal(String(sheet.getCell("A6").value), "Вид отклонения");
+  assert.equal(String(sheet.getCell("C6").value), "RRJ-95");
+  assert.deepEqual([sheet.getCell("C7").value, sheet.getCell("D7").value, sheet.getCell("E7").value].map(String), ["МСК", "СПБ", "Все"]);
+  assert.equal(String(sheet.getCell("F6").value), "всего по а/к");
+
+  const rows: string[] = [];
+  for (let number = 8; number <= sheet.rowCount; number += 1) rows.push(String(sheet.getRow(number).getCell(1).value ?? ""));
+  assert.ok(rows.includes("отклонение выполнения СОП"));
+  assert.ok(rows.includes("Всего отклонений"));
+  assert.ok(rows.includes("Требуют ручной оценки"));
+  // Строки бланка без данных остаются пустыми, но присутствуют.
+  for (const label of ["СДЭ", "НПК", "Всего из ООПИ", "Уходы на 2-ой круг при НЗ"]) assert.ok(rows.includes(label), label);
+
+  const sopRow = 8 + rows.indexOf("отклонение выполнения СОП") + 2; // третья строка группы — 4 уровень
+  assert.equal(String(sheet.getRow(sopRow).getCell(2).value), "4 уровень");
+  assert.equal(sheet.getRow(sopRow).getCell(3).value, 1);           // МСК: один рейс
+  assert.equal(sheet.getRow(sopRow).getCell(5).value, 1);           // Все
+
+  // На листе по событиям тот же рейс даёт три события проверки управления.
+  const events = workbook.getWorksheet("По событиям")!;
+  assert.equal(events.getRow(sopRow).getCell(3).value, 3);
+  assert.equal(sheet.views[0].state, "frozen");
 });
