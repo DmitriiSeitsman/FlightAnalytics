@@ -1774,6 +1774,32 @@
         "reason": "в нормативе уровень задан не значением параметра: 4 уровень — H>41100 ft > 3 s"
       },
       "note": "Условие формирования события по инструкции: _ALT_STD >: TOL ≥ 3s. Текст события в выгрузке не сверялся: образец взят из названия норматива."
+    },
+    {
+      "id": "gpws-alert-summary",
+      "name": {
+        "ru": "Срабатывание сигнала тревоги GPWS (GPWS Alert)",
+        "en": "GPWS Alert"
+      },
+      "category": "Warning",
+      "summaryRow": "оповещение",
+      "source": {
+        "page": 79,
+        "codes": [],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "сигнала тревоги GPWS",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4,
+        "description": "Event — засчитывается сам факт"
+      },
+      "aggregate": true,
+      "note": "Сводное сообщение источника, приходит вместе с конкретным речевым сообщением СРПБЗ."
     }
   ]
 }

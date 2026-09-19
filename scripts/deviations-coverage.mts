@@ -133,7 +133,12 @@ console.log("\nПо исходам классификации:");
 for (const [reason, count] of sorted(perReason)) console.log(`  ${String(count).padStart(6)}  ${reason}`);
 
 console.log("\nСработавшие правила:");
-for (const [key, count] of sorted(perRule)) console.log(`  ${String(count).padStart(6)}  ${key}`);
+const aggregates = new Set(matrix.rules.filter((rule) => rule.aggregate).map((rule) => rule.key));
+for (const [key, count] of sorted(perRule)) {
+  // Сводные события источника здесь считаются распознанными, но в сводку и в список
+  // отклонений они не попадают, если в рейсе есть конкретное сообщение.
+  console.log(`  ${String(count).padStart(6)}  ${key}${aggregates.has(key) ? " (сводное событие источника)" : ""}`);
+}
 
 const silent = matrix.rules.filter((rule) => !perRule.has(rule.key));
 console.log(`\nПравил в матрице: ${matrix.rules.length}, не сработало ни разу: ${silent.length}`);

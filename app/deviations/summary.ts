@@ -16,13 +16,23 @@ export type DeviationEntry = {
 };
 
 // Одно событие может отвечать двум нормативам, поэтому записей бывает больше, чем событий.
+// Сводные события источника («Предупреждение GPWS (уровень Caution)») выбрасываются,
+// если в том же рейсе есть конкретное сообщение того же вида: инструкция нормирует
+// именно конкретные, и считать оба — значит посчитать одно отклонение дважды.
 export function collectDeviations(flights: Flight[], matrix: DeviationMatrix): DeviationEntry[] {
   const entries: DeviationEntry[] = [];
   for (const flight of flights) {
+    const collected: DeviationEntry[] = [];
     for (const event of flight.events ?? []) {
       for (const classification of classifyEventAll(event, flight.aircraftType, matrix)) {
-        entries.push({ id: `${event.id}:${classification.rule.key}`, flight, event, classification });
+        collected.push({ id: `${event.id}:${classification.rule.key}`, flight, event, classification });
       }
+    }
+    const kindOf = (entry: DeviationEntry) => entry.classification.rule.summaryRow ?? `категория:${entry.classification.rule.category}`;
+    const specific = new Set(collected.filter((entry) => !entry.classification.rule.aggregate).map(kindOf));
+    for (const entry of collected) {
+      if (entry.classification.rule.aggregate && specific.has(kindOf(entry))) continue;
+      entries.push(entry);
     }
   }
   return entries;

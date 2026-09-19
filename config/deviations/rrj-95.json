@@ -1151,7 +1151,9 @@
       "trigger": {
         "type": "occurrence",
         "level": 4
-      }
+      },
+      "aggregate": true,
+      "note": "Сводное сообщение источника: приходит вместе с конкретным речевым (AVOID TERRAIN, PULL UP)."
     },
     {
       "id": "early-flap-retraction-after-takeoff",
@@ -2133,6 +2135,58 @@
         }
       },
       "note": "Инструкция запрещает REV IDLE ниже 30 kts и REV MAX ниже 65 kts; по скорости выключения реверса режим не отличить, поэтому берётся порог REV IDLE."
+    },
+    {
+      "id": "gpws-caution-summary",
+      "name": {
+        "ru": "Предупреждение GPWS (уровень Caution)",
+        "en": "GPWS Caution"
+      },
+      "category": "Caution",
+      "summaryRow": "оповещение",
+      "source": {
+        "page": 81,
+        "codes": [],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "Предупреждение GPWS (уровень Caution)",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 2,
+        "description": "Event — засчитывается сам факт"
+      },
+      "aggregate": true,
+      "note": "Источник выдаёт это сообщение вместе с конкретным речевым (DON'T SINK, TERRAIN TERRAIN, GLIDESLOPE): за апрель–август 2026 все 33 случая пришли в паре, ни одного в одиночку. Инструкция нормирует конкретные сообщения, поэтому отклонение считается по ним; уровень 2 остаётся на случай, когда конкретного сообщения в рейсе нет."
+    },
+    {
+      "id": "gpws-alert-summary",
+      "name": {
+        "ru": "Срабатывание сигнала тревоги GPWS (GPWS Alert)",
+        "en": "GPWS Alert"
+      },
+      "category": "Warning",
+      "summaryRow": "оповещение",
+      "source": {
+        "page": 79,
+        "codes": [],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "event",
+        "textContains": "сигнала тревоги GPWS",
+        "patternVerified": true
+      },
+      "trigger": {
+        "type": "occurrence",
+        "level": 4,
+        "description": "Event — засчитывается сам факт"
+      },
+      "aggregate": true,
+      "note": "Сводное сообщение источника, приходит вместе с конкретным речевым сообщением СРПБЗ."
     }
   ]
 }

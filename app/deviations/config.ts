@@ -76,6 +76,9 @@ export type DeviationDocument = { id: string; edition: string; change: string | 
 export type DeviationRule = {
   key: string;        // `${aircraftId}:${id}` — уникален во всей матрице
   id: string;         // уникален внутри типа ВС
+  // Сводное событие источника: дублирует конкретное сообщение того же рейса
+  // («Предупреждение GPWS (уровень Caution)» приходит вместе с DON'T SINK).
+  aggregate: boolean;
   aircraftId: string;
   name: { ru: string; en: string | null };
   category: DeviationCategory;
@@ -387,7 +390,7 @@ function parseRule(raw: unknown, index: number, aircraftId: string, issues: Issu
     issues.push(`${path}: ожидался объект, получено ${describe(raw)}`);
     return null;
   }
-  checkKeys(raw, ["id", "name", "category", "summaryRow", "source", "match", "trigger", "conditions", "note"], path, issues);
+  checkKeys(raw, ["id", "name", "category", "summaryRow", "source", "match", "trigger", "conditions", "note", "aggregate"], path, issues);
   const id = readString(raw, "id", path, issues);
   if (id !== null && !/^[a-z0-9-]+$/.test(id)) {
     issues.push(`${path}.id: допустимы только строчные латинские буквы, цифры и дефис, получено «${id}»`);
@@ -418,8 +421,9 @@ function parseRule(raw: unknown, index: number, aircraftId: string, issues: Issu
   const trigger = parseTrigger(raw.trigger, `${path}.trigger`, issues);
   const conditions = parseConditions(raw.conditions, `${path}.conditions`, issues);
   const note = readOptionalString(raw, "note", path, issues);
+  const aggregate = readOptionalBoolean(raw, "aggregate", path, issues) ?? false;
   if (!id || !name || !category || !match || !trigger) return null;
-  return { key: `${aircraftId}:${id}`, id, aircraftId, name, category, summaryRow, source, match, trigger, conditions, note };
+  return { key: `${aircraftId}:${id}`, id, aircraftId, aggregate, name, category, summaryRow, source, match, trigger, conditions, note };
 }
 
 export function parseDeviationConfig(raw: unknown, issues: Issues): AircraftDeviationSet | null {

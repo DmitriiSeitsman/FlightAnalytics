@@ -141,3 +141,25 @@ test("ручная оценка и уходы на 2-й круг считают�
   assert.equal(manual.cells.get(cellKey("rrj95", "СПБ"))!.flights, 1);
   assert.equal(goaround.cells.get(cellKey("total", ALL_BASES))!.flights, 1);
 });
+
+test("сводное сообщение GPWS не задваивает конкретное", () => {
+  // Источник шлёт «Предупреждение GPWS (уровень Caution)» вместе с речевым сообщением.
+  const both = [flight("f1", "ЛО4 RRJ-95 - АЭ 1,ЛО4 RRJ-95 - АЭ 1", [
+    event("Речевое сообщение DON'T SINK – не снижайся"),
+    event("Предупреждение GPWS (уровень Caution)"),
+  ])];
+  const paired = collectDeviations(both, matrix);
+  assert.deepEqual(paired.map((entry) => entry.classification.rule.id), ["taws-caution-dont-sink"]);
+
+  // Если конкретного сообщения в рейсе нет, сводное остаётся отклонением.
+  const alone = [flight("f2", "ЛО4 RRJ-95 - АЭ 1,ЛО4 RRJ-95 - АЭ 1", [event("Предупреждение GPWS (уровень Caution)")])];
+  const single = collectDeviations(alone, matrix);
+  assert.deepEqual(single.map((entry) => entry.classification.rule.id), ["gpws-caution-summary"]);
+  assert.equal(single[0].classification.level, 2);
+
+  const summary = buildSummaryTable([...both, ...alone], collectDeviations([...both, ...alone], matrix), detachments);
+  const alerts = summary.rows.find((row) => row.row === "оповещение")!;
+  // Два рейса, по одному отклонению 2 уровня в каждом, а не три.
+  assert.equal(alerts.levels.find((level) => level.level === 2)!.total.flights, 2);
+  assert.equal(alerts.levels.find((level) => level.level === 2)!.total.events, 2);
+});
