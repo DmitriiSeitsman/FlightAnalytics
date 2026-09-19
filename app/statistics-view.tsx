@@ -12,7 +12,7 @@ import {
   type FlightMetricKey,
   type StatDimension,
 } from "./flight-data";
-import { ComparisonRangeChart, NormalizedDistributionHistogram, SERIES_COLORS, type ChartSeries } from "./histogram";
+import { ChartMarkerIcon, ComparisonRangeChart, NormalizedDistributionHistogram, PILOT_MARKER_PATH, PLANE_MARKER_PATH, SERIES_COLORS, type ChartSeries } from "./histogram";
 import { downloadStatisticExcel, downloadStatisticPdf } from "./report-export";
 import { SearchableSelect, type SearchableOption } from "./searchable-select";
 
@@ -217,7 +217,7 @@ export function StatisticsView({
       <article className="chart-card">
         <div className="chart-head">
           <div><span>Среднее и диапазон</span><h2>{metricMeta.label}</h2></div>
-          <ul className="chart-legend"><li><i className="range-line-icon" />Мин.–макс.</li><li><i className="mean-dot-icon" />Среднее</li><li><i className="baseline-diamond-icon" />{baselineLabel}</li></ul>
+          <ul className="chart-legend"><li><i className="range-line-icon" />Мин.–макс.</li><li><ChartMarkerIcon path={PILOT_MARKER_PATH} />Среднее</li><li><ChartMarkerIcon path={PLANE_MARKER_PATH} opacity={0.55} />{baselineLabel}</li></ul>
         </div>
         <ComparisonRangeChart rows={selectedRows} metric={metric} series={series} baselineLabel={baselineLabel} />
       </article>

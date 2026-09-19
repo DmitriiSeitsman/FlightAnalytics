@@ -295,6 +295,35 @@ const rangeDomain = (rows: StatisticRow[], metric: FlightMetricKey) => {
 
 const compactLabel = (value: string, limit = 24) => value.length > limit ? `${value.slice(0, limit - 1)}…` : value;
 
+// Маркеры сравнения: силуэт пилота — значение объекта, самолёт — базис по типу ВС.
+// Те же фигуры, что на аватаре в карточке пилота, только контуром, чтобы их можно
+// было красить цветом серии и рисовать одинаково в интерфейсе и в PDF.
+export const PILOT_MARKER_PATH = "M -6.2 7 C -6.2 2.9 -3.4 1.5 0 1.5 C 3.4 1.5 6.2 2.9 6.2 7 Z M -2.8 -1.8 A 2.8 2.8 0 1 1 2.8 -1.8 A 2.8 2.8 0 1 1 -2.8 -1.8 Z M -5.8 -4.2 A 5.8 1.25 0 1 1 5.8 -4.2 A 5.8 1.25 0 1 1 -5.8 -4.2 Z M -4.4 -4.6 C -4.2 -8 4.2 -8 4.4 -4.6 Z";
+export const PLANE_MARKER_PATH = "M 0 -7.2 C 0.95 -7.2 1.6 -6.1 1.6 -4.7 L 1.6 -2.3 L 7.4 1.5 L 7.4 3 L 1.6 1.5 L 1.6 4.3 L 3.4 5.8 L 3.4 6.9 L 0 6 L -3.4 6.9 L -3.4 5.8 L -1.6 4.3 L -1.6 1.5 L -7.4 3 L -7.4 1.5 L -1.6 -2.3 L -1.6 -4.7 C -1.6 -6.1 -0.95 -7.2 0 -7.2 Z";
+
+// Белый контур под заливкой — иначе силуэт теряется на полосе диапазона.
+export function ChartMarker({ path, x, y, color, scale = 1, opacity = 1, title }: { path: string; x: number; y: number; color: string; scale?: number; opacity?: number; title?: string }) {
+  return (
+    <g transform={`translate(${x} ${y}) scale(${scale})`}>
+      <path d={path} fill="none" stroke="#fff" strokeWidth="3.2" strokeLinejoin="round" />
+      <path d={path} fill={color} fillOpacity={opacity}>{title && <title>{title}</title>}</path>
+    </g>
+  );
+}
+
+// Тот же силуэт в легенде графика.
+export function ChartMarkerIcon({ path, color = NAVY, opacity = 1 }: { path: string; color?: string; opacity?: number }) {
+  return (
+    <svg className="chart-legend-icon" viewBox="-9 -9 18 18" width="15" height="15" aria-hidden="true">
+      <path d={path} fill={color} fillOpacity={opacity} />
+    </svg>
+  );
+}
+
+function markerMarkup(path: string, x: number, y: number, color: string, scale: number, opacity = 1): string {
+  return `<g transform="translate(${x} ${y}) scale(${scale})"><path d="${path}" fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linejoin="round"/><path d="${path}" fill="${color}" fill-opacity="${opacity}"/></g>`;
+}
+
 export function ComparisonRangeChart({
   rows,
   metric,
@@ -339,8 +368,8 @@ export function ComparisonRangeChart({
               <circle cx={x(min)} cy={y} r="3" fill={color} opacity=".65" />
               <circle cx={x(max)} cy={y} r="3" fill={color} opacity=".65" />
             </>}
-            {baseline !== null && <path d={`M ${x(baseline)} ${y - 7} L ${x(baseline) + 7} ${y} L ${x(baseline)} ${y + 7} L ${x(baseline) - 7} ${y} Z`} fill="white" stroke={color} strokeWidth="2" />}
-            {mean !== null && <circle cx={x(mean)} cy={y} r="7" fill={color} stroke="white" strokeWidth="2"><title>{`${row.label}: среднее ${formatMetric(mean, metric, true)}, ${baselineLabel.toLocaleLowerCase("ru-RU")} ${formatMetric(baseline, metric, true)}`}</title></circle>}
+            {baseline !== null && <ChartMarker path={PLANE_MARKER_PATH} x={x(baseline)} y={y} color={color} scale={1} opacity={0.6} title={`${baselineLabel}: ${formatMetric(baseline, metric, true)}`} />}
+            {mean !== null && <ChartMarker path={PILOT_MARKER_PATH} x={x(mean)} y={y} color={color} scale={1.1} title={`${row.label}: среднее ${formatMetric(mean, metric, true)}, ${baselineLabel.toLocaleLowerCase("ru-RU")} ${formatMetric(baseline, metric, true)}`} />}
             <text x={width - pad.right + 16} y={y - 4} fill={color} fontSize="12" fontWeight="800">{formatMetric(mean, metric, true)}</text>
             <text x={width - pad.right + 16} y={y + 12} fill={MUTED} fontSize="9">{row.flights.toLocaleString("ru-RU")} рейс.</text>
           </g>;
@@ -429,8 +458,8 @@ export function comparisonRangeSvg(rows: StatisticRow[], metric: FlightMetricKey
     const baseline = row.baselineMetrics[metric];
     return `<text x="${pad.left - 12}" y="${y + 4}" text-anchor="end" fill="${INK}" font-size="10" font-weight="700">${escapeXml(compactLabel(row.label, 26))}</text>
       ${min !== null && max !== null ? `<line x1="${x(min)}" x2="${x(max)}" y1="${y}" y2="${y}" stroke="${color}" stroke-width="5" stroke-linecap="round" opacity=".3"/>` : ""}
-      ${baseline !== null ? `<path d="M ${x(baseline)} ${y - 6} L ${x(baseline) + 6} ${y} L ${x(baseline)} ${y + 6} L ${x(baseline) - 6} ${y} Z" fill="white" stroke="${color}" stroke-width="2"/>` : ""}
-      ${mean !== null ? `<circle cx="${x(mean)}" cy="${y}" r="6" fill="${color}" stroke="white" stroke-width="2"/><text x="${width - pad.right + 12}" y="${y + 4}" fill="${color}" font-size="10" font-weight="700">${escapeXml(formatMetric(mean, metric, true))}</text>` : ""}`;
+      ${baseline !== null ? markerMarkup(PLANE_MARKER_PATH, x(baseline), y, color, 0.85, 0.6) : ""}
+      ${mean !== null ? `${markerMarkup(PILOT_MARKER_PATH, x(mean), y, color, 0.95)}<text x="${width - pad.right + 12}" y="${y + 4}" fill="${color}" font-size="10" font-weight="700">${escapeXml(formatMetric(mean, metric, true))}</text>` : ""}`;
   }).join("");
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Среднее, диапазон и ${escapeXml(baselineLabel.toLocaleLowerCase("ru-RU"))}"><rect width="${width}" height="${height}" fill="#fff"/>${grid}${marks}</svg>`;
 }
