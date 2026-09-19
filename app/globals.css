@@ -759,3 +759,27 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
   letter-spacing: 0;
   text-transform: none;
 }
+
+/* Вкладка «Отклонения»: сводная таблица приложения 5А и список отклонений. */
+.deviations-view { display: flex; flex-direction: column; gap: 28px; }
+.deviation-summary h3, .deviation-list h3 { margin: 0 0 8px; font-size: 14px; }
+
+.summary-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.summary-table th, .summary-table td { padding: 6px 8px; border-bottom: 1px solid #e5e9ea; text-align: center; }
+.summary-table thead th { background: #f6f8f9; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.summary-table th.summary-base { font-weight: 600; color: #63717d; }
+.summary-table tbody th { text-align: left; font-weight: 600; white-space: nowrap; }
+.summary-table td b { font-weight: 700; }
+.summary-table td small { color: #8b98a2; }
+.summary-zero { color: #c3ccd2; }
+.summary-empty-row { opacity: 0.55; }
+.summary-level span { display: inline-block; padding: 2px 8px; border: 1px solid; border-radius: 999px; font-size: 9px; font-weight: 700; white-space: nowrap; }
+.summary-total-row { background: #fbfcfc; }
+.summary-total-row th, .summary-total-row td { font-weight: 700; }
+.summary-extra-row th { color: #4d5a64; }
+
+.deviations-table td small { display: block; color: #8b98a2; font-size: 10px; }
+.deviations-table .deviation-rule { margin-top: 2px; color: #63717d; }
+.deviation-crew b { color: #4d5a64; }
+.deviation-row { cursor: pointer; }
+.deviation-row:hover { background: #f2f7fa; }

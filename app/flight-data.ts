@@ -25,7 +25,7 @@ export function violatesLimit(key: FlightMetricKey, value: number | null): boole
 export type Metrics = Record<FlightMetricKey, number | null>;
 export type SheetRow = Record<string, unknown>;
 type CrewMember = { code: string; name: string; role: "CM1" | "CM2" };
-export type Flight = { key: string; aircraftType: string; departure: string; arrival: string; crew: CrewMember[]; metrics: Metrics; flightNumber: string; date: string; departureTime: string; arrivalTime: string; board: string; events: Event[] };
+export type Flight = { key: string; aircraftType: string; departure: string; arrival: string; crew: CrewMember[]; metrics: Metrics; flightNumber: string; date: string; departureTime: string; arrivalTime: string; board: string; events: Event[]; detachment: string };
 
 export type EventColor = "clRed" | "clOrange" | "clBlack" | "clGreen" | "clOlive" | "clFuchsia" | "unknown";
 export type EventParameter = { name: string; max: string; min: string };
@@ -441,6 +441,8 @@ export function parseFlightRows(rows: SheetRow[], headers: string[]): ImportResu
       departureTime: firstFilled(group, "Vremya_Vzleta"),
       arrivalTime: firstFilled(group, "Vremya_Posadki"),
       board: firstFilled(group, "Bort"),
+      // Пара «отряд КВС, отряд 2П»; нужна для базы рейса в сводной таблице отклонений.
+      detachment: firstFilled(group, "Letnie_Otryady"),
       events: [],
     };
   });

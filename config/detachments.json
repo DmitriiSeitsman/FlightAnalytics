@@ -1,0 +1,10 @@
+{
+  "source": "CrewPlannerWeb, database/migrations/015_normalized_flight_organization.sql",
+  "note": "Лётный отряд командира определяет базу рейса в сводной таблице. Отряды, которых здесь нет (ЛО 3, УТО, СЛТС, ИБП, учебные АЭ), попадают только в колонку «Все».",
+  "detachments": [
+    { "id": "ЛО 1", "prefix": "ЛО1", "base": "СПБ" },
+    { "id": "ЛО 2", "prefix": "ЛО2", "base": "МСК" },
+    { "id": "ЛО 4", "prefix": "ЛО4", "base": "МСК" },
+    { "id": "ЛО 5", "prefix": "ЛО5", "base": "СПБ" }
+  ]
+}
