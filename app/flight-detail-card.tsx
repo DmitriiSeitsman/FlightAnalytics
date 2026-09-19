@@ -1,8 +1,8 @@
 "use client";
 
-import { formatFlightDate, formatMetric, metricDefinitions, violatesLimit, type Flight, type Metrics } from "./flight-data";
+import { formatFlightDate, formatMetric, metricDefinitions, type Flight, type Metrics } from "./flight-data";
 import { COLOR_LABELS, COLOR_STYLES } from "./events-analytics";
-import { classifyEventAll } from "./deviations/classify";
+import { classifyEventAll, classifyMetric } from "./deviations/classify";
 import { deviationMatrix } from "./deviations/registry";
 import { DeviationBadge } from "./deviations/badge";
 import { deviationSummary, displayDeviation, LEVEL_STYLES, worstLevel } from "./deviations/presentation";
@@ -19,7 +19,7 @@ interface FlightDetailCardProps {
 }
 
 // Полоса показывает, где значение рейса внутри диапазона по типу ВС. Цветом здесь не судим:
-// красный только за нарушение жёсткого ограничения (metricLimits), диапазон — просто контекст.
+// красный только за норматив из матрицы, диапазон — просто контекст.
 function MetricRange({ value, min, max, avg, alert }: { value: number; min: number; max: number; avg: number | null; alert: boolean }) {
   const span = max - min;
   if (!(span > 0)) return null;
@@ -111,7 +111,9 @@ export function FlightDetailCard({ flight, onClose, positions, typeSummary, onSe
             <div className="fd-metrics">
               {metricDefinitions.map((metric) => {
                 const value = flight.metrics[metric.key];
-                const alert = violatesLimit(metric.key, value);
+                // Предел по показателю рейса — из матрицы нормативов для этого типа ВС.
+                const limit = classifyMetric(metric.key, value, flight.aircraftType, deviationMatrix);
+                const alert = limit !== null && limit.level !== null;
                 const min = typeSummary?.minMetrics[metric.key] ?? null;
                 const max = typeSummary?.maxMetrics[metric.key] ?? null;
                 const avg = typeSummary?.metrics[metric.key] ?? null;
@@ -122,7 +124,10 @@ export function FlightDetailCard({ flight, onClose, positions, typeSummary, onSe
                   <div className="fd-metric" key={metric.key} title={hint}>
                     <div className="fd-metric-top">
                       <span>{metric.label}</span>
-                      <b className={alert ? "is-alert" : ""}>{formatMetric(value, metric.key, true)}</b>
+                      <span className="fd-metric-value">
+                        {alert && limit && <DeviationBadge display={displayDeviation(limit)} />}
+                        <b className={alert ? "is-alert" : ""}>{formatMetric(value, metric.key, true)}</b>
+                      </span>
                     </div>
                     {value !== null && min !== null && max !== null && (
                       <MetricRange value={value} min={min} max={max} avg={avg} alert={alert} />

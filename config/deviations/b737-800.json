@@ -626,8 +626,14 @@
         "patternVerified": false
       },
       "trigger": {
-        "type": "manual",
-        "reason": "в нормативе уровень задан не значением параметра: 2 уровень — 0 kts; 3 уровень — - 3 kts; 4 уровень — - 5 kts"
+        "type": "threshold",
+        "compare": "lessOrEqual",
+        "unit": "kts",
+        "levels": {
+          "2": 0.0,
+          "3": -3.0,
+          "4": -5.0
+        }
       },
       "note": "Условие формирования события по инструкции: _VTKO<: TOL ≥ 3s (CAS–V2 ≤ ; TOL ≥ 3s). Текст события в выгрузке не сверялся: образец взят из названия норматива."
     },
@@ -1189,7 +1195,7 @@
       },
       "trigger": {
         "type": "threshold",
-        "compare": "greaterOrEqual",
+        "compare": "lessOrEqual",
         "unit": "g",
         "levels": {
           "4": {
@@ -1222,7 +1228,7 @@
       },
       "trigger": {
         "type": "threshold",
-        "compare": "greaterOrEqual",
+        "compare": "lessOrEqual",
         "unit": "g",
         "levels": {
           "4": {
@@ -1319,7 +1325,7 @@
       },
       "trigger": {
         "type": "threshold",
-        "compare": "greaterOrEqual",
+        "compare": "lessOrEqual",
         "unit": "ft",
         "levels": {
           "4": 1000.0
@@ -1349,7 +1355,7 @@
       },
       "trigger": {
         "type": "threshold",
-        "compare": "greaterOrEqual",
+        "compare": "lessOrEqual",
         "levels": {
           "4": {
             "value": 30.0,

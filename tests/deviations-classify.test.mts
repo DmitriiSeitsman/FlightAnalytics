@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildDeviationMatrix, type DeviationMatrix } from "../app/deviations/config.ts";
-import { classifyEvent, classifyEventAll, describeTrigger, findRule, parseEventNumber, type ClassifiableEvent } from "../app/deviations/classify.ts";
+import { classifyEvent, classifyEventAll, classifyMetric, describeTrigger, findRule, parseEventNumber, type ClassifiableEvent } from "../app/deviations/classify.ts";
 
 const configDir = join(dirname(fileURLToPath(import.meta.url)), "..", "config", "deviations");
 
@@ -224,8 +224,9 @@ test("со-условия по высоте разводят полосы одн
 });
 
 test("правила без вычислимого уровня честно просят ручной оценки", () => {
-  const result = classifyEvent(event("Двойное управление самолетом", { "Xcp.l": "3,1", "Xcp.r": "2,8" }), "RRJ-95B", matrix);
-  assert.equal(result?.rule.id, "dual-input");
+  // Окно события по рулению захватывает разбег, поэтому уровень по нему не считается.
+  const result = classifyEvent(event("Технологическое сообщение. Скорость на рулении больше рекомендованной 30 knots", { Vgr: "57" }), "RRJ-95B", matrix);
+  assert.equal(result?.rule.id, "taxi-speed-straight");
   assert.equal(result?.level, null);
   assert.equal(result?.reason, "manual-review");
   assert.match(describeTrigger(result!.rule.trigger), /^уровень вручную: /);
@@ -250,4 +251,39 @@ test("реальные тексты выгрузки разбираются в �
   }
   // Технологические сообщения нормативов не имеют и остаются нераспознанными.
   assert.equal(findRule(event("Технологическое сообщение. Использование режима DERATE(FLEX) при взлете."), "RRJ-95B", matrix), null);
+});
+
+test("предел по показателю рейса берётся из матрицы, а не из кода", () => {
+  // RRJ: инструкция запрещает реверс ниже 30 узлов — это 2 уровень.
+  assert.equal(classifyMetric("reverseOffSpeed", 28, "RRJ-95B", matrix)?.level, 2);
+  assert.equal(classifyMetric("reverseOffSpeed", 45, "RRJ-95B", matrix)?.level, null);
+  assert.equal(classifyMetric("reverseOffSpeed", 45, "RRJ-95B", matrix)?.reason, "below-threshold");
+
+  // Б777: у того же норматива своя лестница 30 / 20 / 10 узлов.
+  assert.equal(classifyMetric("reverseOffSpeed", 25, "Boeing 777-300", matrix)?.level, 2);
+  assert.equal(classifyMetric("reverseOffSpeed", 15, "Boeing 777-300", matrix)?.level, 3);
+  assert.equal(classifyMetric("reverseOffSpeed", 8, "Boeing 777-300ER", matrix)?.level, 4);
+
+  // У типов, где такого норматива в инструкции нет, предел не выдумывается.
+  assert.equal(classifyMetric("reverseOffSpeed", 10, "Boeing-737-800", matrix), null);
+  assert.equal(classifyMetric("reverseOffSpeed", 10, "Airbus 320", matrix), null);
+  assert.equal(classifyMetric("reverseOffSpeed", null, "RRJ-95B", matrix), null);
+  assert.equal(classifyMetric("landingNy", 2.5, "RRJ-95B", matrix), null);
+});
+
+test("правила по метрикам не попадают в классификацию событий", () => {
+  // Иначе одно отклонение считалось бы дважды: по событию и по показателю рейса.
+  const results = classifyEventAll(event("Использование режима REV IDLE на скорости менее 30 knots"), "RRJ-95B", matrix);
+  assert.deepEqual(results.map((item) => item.rule.id), ["reverser-idle-at-low-speed"]);
+});
+
+test("интенсивное торможение и двойное управление засчитываются по факту", () => {
+  const braking = classifyEvent(event("Интенсивное торможение на пробеге после посадки", { Nx: "-0,42" }), "RRJ-95B", matrix);
+  assert.equal(braking?.rule.id, "intensive-braking");
+  assert.equal(braking?.reason, "occurrence");
+  assert.equal(braking?.level, 2);
+
+  const dual = classifyEvent(event("Двойное управление самолетом"), "RRJ-95B", matrix);
+  assert.equal(dual?.reason, "occurrence");
+  assert.equal(dual?.level, 2);
 });

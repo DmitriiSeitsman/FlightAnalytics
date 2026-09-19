@@ -111,10 +111,8 @@ function levelFromLadder(ladder: LevelThreshold[], value: number): DeviationLeve
   return level;
 }
 
-function evaluate(rule: DeviationRule, event: ClassifiableEvent, conditions: ConditionState): DeviationClassification {
-  const parameter = rule.match.kind === "event" ? rule.match.parameter : null;
-  const use = rule.match.kind === "event" ? rule.match.use : "max";
-  const value = parameter ? readParameter(event, parameter, use) : null;
+// Общая часть: правило найдено, значение известно — остаётся разложить его по лестнице.
+function evaluateTrigger(rule: DeviationRule, parameter: string | null, value: number | null, conditions: ConditionState): DeviationClassification {
   const unit = rule.trigger.type === "threshold" ? rule.trigger.unit : null;
   const base = { rule, parameter, value, unit, failedCondition: null };
   if (!conditions.ok) return { ...base, level: null, reason: conditions.reason, failedCondition: conditions.condition };
@@ -123,6 +121,24 @@ function evaluate(rule: DeviationRule, event: ClassifiableEvent, conditions: Con
   if (value === null) return { ...base, level: null, reason: "no-value" };
   const level = levelFromLadder(rule.trigger.ladder, value);
   return { ...base, level, reason: level === null ? "below-threshold" : "threshold" };
+}
+
+function evaluate(rule: DeviationRule, event: ClassifiableEvent, conditions: ConditionState): DeviationClassification {
+  const parameter = rule.match.kind === "event" ? rule.match.parameter : null;
+  const use = rule.match.kind === "event" ? rule.match.use : "max";
+  const value = parameter ? readParameter(event, parameter, use) : null;
+  return evaluateTrigger(rule, parameter, value, conditions);
+}
+
+// Показатель самого рейса, а не события: реверс выключен ниже допустимой скорости и т. п.
+// Такие правила в сводку не идут — иначе одно и то же отклонение считалось бы дважды,
+// по событию и по метрике.
+export function classifyMetric(metric: string, value: number | null, aircraftType: string, matrix: DeviationMatrix): DeviationClassification | null {
+  const set = resolveAircraftRules(matrix, aircraftType);
+  if (!set) return null;
+  const rule = set.rules.find((item) => item.match.kind === "metric" && item.match.metric === metric);
+  if (!rule || value === null) return null;
+  return evaluateTrigger(rule, metric, value, { ok: true });
 }
 
 const reasonRank: Record<ClassificationReason, number> = {

@@ -438,7 +438,7 @@
       },
       "trigger": {
         "type": "threshold",
-        "compare": "greaterOrEqual",
+        "compare": "lessOrEqual",
         "unit": "g",
         "levels": {
           "4": {
@@ -472,7 +472,7 @@
       },
       "trigger": {
         "type": "threshold",
-        "compare": "greaterOrEqual",
+        "compare": "lessOrEqual",
         "unit": "g",
         "levels": {
           "4": {
@@ -565,7 +565,7 @@
       },
       "trigger": {
         "type": "threshold",
-        "compare": "greaterOrEqual",
+        "compare": "lessOrEqual",
         "unit": "ft",
         "levels": {
           "4": 400.0
@@ -596,7 +596,7 @@
       },
       "trigger": {
         "type": "threshold",
-        "compare": "greaterOrEqual",
+        "compare": "lessOrEqual",
         "unit": "ft",
         "levels": {
           "4": 1000.0
@@ -913,8 +913,14 @@
         "patternVerified": false
       },
       "trigger": {
-        "type": "manual",
-        "reason": "в нормативе уровень задан не значением параметра: 2 уровень — 0 kts; 3 уровень — - 3 kts; 4 уровень — - 5 kts"
+        "type": "threshold",
+        "compare": "lessOrEqual",
+        "unit": "kts",
+        "levels": {
+          "2": 0.0,
+          "3": -3.0,
+          "4": -5.0
+        }
       },
       "note": "Условие формирования события по инструкции: _VTKO<: TOL ≥ 3s (CAS–V2 ≤ ; TOL ≥ 3s). Текст события в выгрузке не сверялся: образец взят из названия норматива."
     },
@@ -1943,6 +1949,44 @@
         "reason": "в нормативе уровень задан не значением параметра: 2 уровень — Caution: \"G/S\""
       },
       "note": "Условие формирования события по инструкции: GPWS_ Cau- tion. Текст события в выгрузке не сверялся: образец взят из названия норматива."
+    },
+    {
+      "id": "reverse-off-speed",
+      "name": {
+        "ru": "Выключение реверса на скорости менее 30 kts",
+        "en": "Reversers Abusive Use"
+      },
+      "category": "Engine",
+      "summaryRow": "конфигурация",
+      "source": {
+        "page": 53,
+        "codes": [],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "metric",
+        "metric": "reverseOffSpeed"
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "less",
+        "unit": "уз",
+        "levels": {
+          "2": {
+            "value": 30,
+            "compare": "less"
+          },
+          "3": {
+            "value": 20,
+            "compare": "less"
+          },
+          "4": {
+            "value": 10,
+            "compare": "less"
+          }
+        }
+      },
+      "note": "Норматив «Использование реверса тяги на скорости меньше 30 kts» применён к скорости выключения реверса из выгрузки рейсов."
     }
   ]
 }

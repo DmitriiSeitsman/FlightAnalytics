@@ -1143,8 +1143,11 @@
         "patternVerified": false
       },
       "trigger": {
-        "type": "manual",
-        "reason": "в нормативе уровень задан не значением параметра: 4 уровень — >=0.42"
+        "type": "threshold",
+        "compare": "greaterOrEqual",
+        "levels": {
+          "4": 0.42
+        }
       },
       "note": "Условие формирования события по инструкции: Nz≥:. Текст события в выгрузке не сверялся: образец взят из названия норматива."
     },
@@ -1170,7 +1173,7 @@
       },
       "trigger": {
         "type": "threshold",
-        "compare": "greaterOrEqual",
+        "compare": "lessOrEqual",
         "levels": {
           "2": -0.4
         }
@@ -1224,7 +1227,7 @@
       },
       "trigger": {
         "type": "threshold",
-        "compare": "greaterOrEqual",
+        "compare": "lessOrEqual",
         "levels": {
           "4": {
             "value": 400.0,
@@ -1282,7 +1285,7 @@
       },
       "trigger": {
         "type": "threshold",
-        "compare": "greaterOrEqual",
+        "compare": "lessOrEqual",
         "unit": "ft",
         "levels": {
           "4": 1000.0
@@ -1512,10 +1515,11 @@
         "patternVerified": false
       },
       "trigger": {
-        "type": "manual",
-        "reason": "в нормативе уровень задан не значением параметра: 3 уровень — TOL>0.25 s; 4 уровень — TOL > 3 s"
+        "type": "occurrence",
+        "level": 3,
+        "description": "Event — засчитывается сам факт события"
       },
-      "note": "Условие формирования события по инструкции: (x ≥ 2°) AND (y ≥ 2°). Текст события в выгрузке не сверялся: образец взят из названия норматива."
+      "note": "Условие формирования события по инструкции: (x ≥ 2°) AND (y ≥ 2°). Текст события в выгрузке не сверялся: образец взят из названия норматива. Уровень по длительности не определяется, отклонение засчитывается по факту. Было в инструкции: 3 уровень — TOL>0.25 s; 4 уровень — TOL > 3 s"
     },
     {
       "id": "gpws-warning-above-1000-ft-afe",

@@ -10,18 +10,8 @@ export const metricDefinitions = [
 ] as const;
 export type FlightMetricKey = typeof metricDefinitions[number]["key"];
 
-// Жёсткие ограничения по параметрам: выход за них подсвечивается красным в карточке рейса.
-// Это не диапазон по типу ВС (тот лишь контекст), а именно предел. Пока задан один.
-export type MetricLimit = { min?: number; max?: number };
-export const metricLimits: Partial<Record<FlightMetricKey, MetricLimit>> = {
-  reverseOffSpeed: { min: 40 },
-};
-export function violatesLimit(key: FlightMetricKey, value: number | null): boolean {
-  if (value === null) return false;
-  const limit = metricLimits[key];
-  if (!limit) return false;
-  return (limit.min !== undefined && value < limit.min) || (limit.max !== undefined && value > limit.max);
-}
+// Жёстких порогов здесь больше нет: пределы по показателям рейса берутся из матрицы
+// нормативов (config/deviations/<тип>.json, правила с match.kind = "metric").
 export type Metrics = Record<FlightMetricKey, number | null>;
 export type SheetRow = Record<string, unknown>;
 type CrewMember = { code: string; name: string; role: "CM1" | "CM2" };

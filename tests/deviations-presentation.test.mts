@@ -32,7 +32,7 @@ test("уровень получает свой цвет, а прочие исх�
   assert.notEqual(below.style, LEVEL_STYLES[2]);
   assert.match(below.title, /раньше, чем начинаются уровни/);
 
-  const manual = displayDeviation(classify("Двойное управление самолетом")[0]);
+  const manual = displayDeviation(classify("Технологическое сообщение. Скорость на рулении больше рекомендованной 30 knots", { Vgr: "57" })[0]);
   assert.equal(manual.label, "ручная оценка");
 
   const noValue = displayDeviation(classify("Посадка с вертикальной перегрузкой более 1.7 g")[0]);
@@ -49,6 +49,6 @@ test("группа фильтра считается по самому тяжё�
   const hardLanding = classify("Грубая посадка при посадочном весе меньше максимально допустимого значения", { Ny: "1,586", VyHg: "-579,2" });
   assert.equal(worstLevel(hardLanding), 4);
   assert.equal(levelFilterOf(hardLanding), "4");
-  assert.equal(levelFilterOf(classify("Двойное управление самолетом")), "none");
+  assert.equal(levelFilterOf(classify("Технологическое сообщение. Скорость на рулении больше рекомендованной 30 knots", { Vgr: "57" })), "none");
   assert.equal(levelFilterOf(classify("Технологическое сообщение. Использование режима TOGA при взлете.")), "unmatched");
 });

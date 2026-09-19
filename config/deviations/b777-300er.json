@@ -481,8 +481,15 @@
         "patternVerified": false
       },
       "trigger": {
-        "type": "manual",
-        "reason": "в нормативе уровень задан не значением параметра: 4 уровень — > + 2,5 G < - 1,0 G"
+        "type": "threshold",
+        "compare": "lessOrEqual",
+        "unit": "g",
+        "levels": {
+          "4": {
+            "value": 2.5,
+            "compare": "greater"
+          }
+        }
       },
       "note": "Условие формирования события по инструкции: VRTGMAX>: OR VRTGMIN <:. Текст события в выгрузке не сверялся: образец взят из названия норматива."
     },
@@ -532,8 +539,15 @@
         "patternVerified": false
       },
       "trigger": {
-        "type": "manual",
-        "reason": "в нормативе уровень задан не значением параметра: 4 уровень — >+ 2,0 G < 0,0 G"
+        "type": "threshold",
+        "compare": "lessOrEqual",
+        "unit": "g",
+        "levels": {
+          "4": {
+            "value": 2.0,
+            "compare": "greater"
+          }
+        }
       },
       "note": "Условие формирования события по инструкции: VRTGMAX >: OR VRTGMIN <:. Текст события в выгрузке не сверялся: образец взят из названия норматива."
     },
@@ -624,7 +638,7 @@
       },
       "trigger": {
         "type": "threshold",
-        "compare": "greaterOrEqual",
+        "compare": "lessOrEqual",
         "unit": "ft",
         "levels": {
           "4": 400.0
@@ -655,7 +669,7 @@
       },
       "trigger": {
         "type": "threshold",
-        "compare": "greaterOrEqual",
+        "compare": "lessOrEqual",
         "unit": "ft",
         "levels": {
           "4": 1000.0
@@ -2147,6 +2161,44 @@
         "reason": "в нормативе уровень задан не значением параметра: 2 уровень — Cau- tion:\"G/S\""
       },
       "note": "Условие формирования события по инструкции: GPWS_ Caution. Текст события в выгрузке не сверялся: образец взят из названия норматива."
+    },
+    {
+      "id": "reverse-off-speed",
+      "name": {
+        "ru": "Выключение реверса на скорости менее 30 kts",
+        "en": "Reversers Abusive Use"
+      },
+      "category": "Engine",
+      "summaryRow": "конфигурация",
+      "source": {
+        "page": 46,
+        "codes": [],
+        "origin": "instruction"
+      },
+      "match": {
+        "kind": "metric",
+        "metric": "reverseOffSpeed"
+      },
+      "trigger": {
+        "type": "threshold",
+        "compare": "less",
+        "unit": "уз",
+        "levels": {
+          "2": {
+            "value": 30,
+            "compare": "less"
+          },
+          "3": {
+            "value": 20,
+            "compare": "less"
+          },
+          "4": {
+            "value": 10,
+            "compare": "less"
+          }
+        }
+      },
+      "note": "Норматив «Использование реверса тяги на скорости меньше 30 kts» применён к скорости выключения реверса из выгрузки рейсов."
     }
   ]
 }
