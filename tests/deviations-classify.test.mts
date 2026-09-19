@@ -84,7 +84,7 @@ test("без параметра в событии уровень не выдум
 });
 
 test("тип ВС без конфига не классифицируется", () => {
-  assert.equal(classifyEvent(touchdownNy("1,9"), "Boeing-737-800", matrix), null);
+  assert.equal(classifyEvent(touchdownNy("1,9"), "Embraer 190", matrix), null);
   assert.equal(classifyEvent(touchdownNy("1,9"), "", matrix), null);
 });
 

@@ -151,3 +151,42 @@ test("правило с ручной оценкой уровня проходи�
   const error = broken((c) => { rulesOf(c)[0].trigger = { type: "manual" }; });
   assert.ok(error.issues.some((issue) => issue.includes("trigger.reason")));
 });
+
+test("каждый тип ВС из выгрузок находит свой конфиг", () => {
+  const matrix = buildDeviationMatrix(realConfigs());
+  const exported = [
+    "RRJ-95B", "RRJ-95LR", "Airbus 319", "Airbus 320",
+    "Boeing-737-800", "Boeing-737-900ER", "Boeing 777-300", "Boeing 777-300ER", "Boeing 747-400",
+  ];
+  for (const type of exported) {
+    const set = resolveAircraftRules(matrix, type);
+    assert.ok(set, `тип «${type}» из выгрузки не находит конфиг нормативов`);
+    assert.ok(set.rules.length > 0, `конфиг для «${type}» пустой`);
+  }
+  assert.equal(resolveAircraftRules(matrix, "Embraer 190"), null);
+});
+
+test("модификации одного семейства получают свои пороги", () => {
+  const matrix = buildDeviationMatrix(realConfigs());
+  // Тангаж на отрыве: у 737-800 норматив 9.0°, у 737-900 — 8.0°, и это разные конфиги.
+  const liftOff = (type: string) => {
+    const set = resolveAircraftRules(matrix, type)!;
+    const rule = set.rules.find((item) => item.id.startsWith("pitch-high-at-lift-off"))!;
+    assert.equal(rule.trigger.type, "threshold");
+    return rule.trigger.type === "threshold" ? rule.trigger.ladder.find((step) => step.level === 2)!.value : null;
+  };
+  assert.equal(liftOff("Boeing-737-800"), 9);
+  assert.equal(liftOff("Boeing-737-900ER"), 8);
+  assert.equal(liftOff("Boeing 777-300"), 8);
+  assert.equal(liftOff("Boeing 777-300ER"), 9);
+
+  // Перегрузка на посадке: у Б777 порог ниже, чем у остальных типов.
+  const touchdownNy = (type: string) => {
+    const set = resolveAircraftRules(matrix, type)!;
+    const rule = set.rules.find((item) => /acceleration-at-touch|high-acceleration-at-touchdown/.test(item.id))!;
+    return rule.trigger.type === "threshold" ? rule.trigger.ladder.find((step) => step.level === 2)!.value : null;
+  };
+  assert.equal(touchdownNy("Boeing 777-300"), 1.62);
+  assert.equal(touchdownNy("Boeing-737-800"), 1.76);
+  assert.equal(touchdownNy("RRJ-95B"), 1.76);
+});
