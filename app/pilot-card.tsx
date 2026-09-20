@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatFlightDate, formatMetric, metricDefinitions, normalizeFlightDate, worstEventColor, summarizeEventColors, type Flight, type FlightMetricKey, type PilotRow, type PilotSummary } from "./flight-data";
+import { buildAirportAverages, formatFlightDate, formatMetric, metricDefinitions, normalizeFlightDate, worstEventColor, summarizeEventColors, type Flight, type FlightMetricKey, type PilotRow, type PilotSummary } from "./flight-data";
 import { PilotRangeProfile, SEAT_COLORS, type PilotProfileAxis } from "./histogram";
 import { COLOR_LABELS, COLOR_STYLES } from "./events-analytics";
 import { FlightDetailCard } from "./flight-detail-card";
@@ -57,6 +57,9 @@ export function PilotCard({ pilotRow, flights, onClose, positions, onSelectPilot
       flight.crew.some((member) => member.code === pilotRow.code && picked.includes(member.role))
     );
   }, [flights, pilotRow.aircraftType, pilotRow.code, seatKey]);
+
+  // Средние по аэропортам для карточки рейса, открытой из списка рейсов пилота.
+  const airportAverages = useMemo(() => buildAirportAverages(flights), [flights]);
 
   const dateRange = useMemo(() => {
     const dates = pilotFlights.map((flight) => normalizeFlightDate(flight.date)).filter((date): date is string => Boolean(date));
@@ -487,6 +490,7 @@ export function PilotCard({ pilotRow, flights, onClose, positions, onSelectPilot
       onClose={() => setSelectedFlight(null)}
       positions={positions}
       typeSummary={{ metrics: pilot.typeMetrics, minMetrics: pilot.typeMinMetrics, maxMetrics: pilot.typeMaxMetrics }}
+      airportAverages={airportAverages}
       onSelectPilot={onSelectPilot && ((code, type) => { setSelectedFlight(null); onSelectPilot(code, type); })}
     />}
     </>

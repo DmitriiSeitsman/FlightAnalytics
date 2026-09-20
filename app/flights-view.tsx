@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { formatFlightDate, normalizeFlightDate, shortenPilotName, summarizeFlights, worstEventColor, summarizeEventColors, type Flight } from "./flight-data";
+import { buildAirportAverages, formatFlightDate, normalizeFlightDate, shortenPilotName, summarizeFlights, worstEventColor, summarizeEventColors, type Flight } from "./flight-data";
 import { COLOR_LABELS, COLOR_STYLES } from "./events-analytics";
 import { FlightDetailCard, type FlightTypeSummary } from "./flight-detail-card";
 
@@ -33,6 +33,8 @@ export function FlightsView({ flights, positions, onSelectPilot }: FlightsViewPr
     () => new Map<string, FlightTypeSummary>(summarizeFlights(flights, "aircraftType").map((item) => [item.label, item])),
     [flights],
   );
+  // Средние по аэропортам вылета и посадки — тоже один раз на всю выборку.
+  const airportAverages = useMemo(() => buildAirportAverages(flights), [flights]);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<{ key: FlightsSortKey; direction: SortDirection }>({ key: "date", direction: "asc" });
   const [currentPage, setCurrentPage] = useState(1);
@@ -198,6 +200,7 @@ export function FlightsView({ flights, positions, onSelectPilot }: FlightsViewPr
         onClose={() => setSelectedFlight(null)}
         positions={positions}
         typeSummary={typeSummaries.get(selectedFlight.aircraftType)}
+        airportAverages={airportAverages}
         onSelectPilot={onSelectPilot && ((code, type) => { setSelectedFlight(null); onSelectPilot(code, type); })}
       />}
     </div>

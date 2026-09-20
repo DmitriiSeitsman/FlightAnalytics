@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildStatisticRows, collectMetricSeries, histogramBins, multiHistogramBins, normalizeFlightDate, parseFlightRows, summarizePilots, type Flight, type SheetRow } from "../app/flight-data.ts";
+import { airportAverageFor, buildAirportAverages, buildStatisticRows, collectMetricSeries, histogramBins, multiHistogramBins, normalizeFlightDate, parseFlightRows, summarizePilots, type Flight, type SheetRow } from "../app/flight-data.ts";
 
 function flight(overrides: Partial<Omit<Flight, "metrics">> & Pick<Flight, "key" | "crew"> & { metrics?: Partial<Flight["metrics"]> }): Flight {
   const base: Flight = {
@@ -162,4 +162,31 @@ test("rows with different filled times stay separate flights", () => {
 
   assert.equal(result.flights.length, 2);
   assert.deepEqual(result.flights.map((item) => item.departureTime).sort(), ["04:51:47", "12:20:05"]);
+});
+
+test("buildAirportAverages splits airports by aircraft type and by takeoff or landing", () => {
+  const flights = [
+    flight({ key: "1", crew: [], departure: "Пулково", arrival: "Сочи", metrics: { takeoffPitch: 8, landingNy: 1.2 } }),
+    flight({ key: "2", crew: [], departure: "Пулково", arrival: "Сочи", metrics: { takeoffPitch: 10, landingNy: 1.4 } }),
+    // Тот же аэропорт, но другой тип ВС — в среднее по A-319/320 попасть не должен.
+    flight({ key: "3", crew: [], aircraftType: "RRJ-95", departure: "Пулково", arrival: "Сочи", metrics: { takeoffPitch: 2, landingNy: 2 } }),
+    // Тот же аэропорт, но как аэропорт посадки — на среднее по вылету не влияет.
+    flight({ key: "4", crew: [], departure: "Сочи", arrival: "Пулково", metrics: { takeoffPitch: 20, landingNy: 1.9 } }),
+  ];
+  const averages = buildAirportAverages(flights);
+  const sample = flights[0]!;
+
+  const departure = airportAverageFor(averages, sample, "departure");
+  assert.equal(departure?.flights, 2);
+  assert.equal(departure?.metrics.takeoffPitch, 9);
+
+  const arrival = airportAverageFor(averages, sample, "arrival");
+  assert.equal(arrival?.flights, 2);
+  assert.ok(Math.abs((arrival?.metrics.landingNy ?? 0) - 1.3) < 1e-9);
+
+  const otherType = airportAverageFor(averages, flights[2]!, "departure");
+  assert.equal(otherType?.flights, 1);
+  assert.equal(otherType?.metrics.takeoffPitch, 2);
+
+  assert.equal(airportAverageFor(undefined, sample, "departure"), null);
 });

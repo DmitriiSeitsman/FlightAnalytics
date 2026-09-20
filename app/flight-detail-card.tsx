@@ -1,6 +1,7 @@
 "use client";
 
-import { formatFlightDate, formatMetric, metricDefinitions, type Flight, type Metrics } from "./flight-data";
+import { airportAverageFor, formatFlightDate, formatMetric, metricDefinitions, type AirportAverage, type AirportAverages, type Flight, type Metrics } from "./flight-data";
+import { MarkerGlyph } from "./marker-icons";
 import { COLOR_LABELS, COLOR_STYLES } from "./events-analytics";
 import { classifyEventAll, classifyMetric } from "./deviations/classify";
 import { deviationMatrix } from "./deviations/registry";
@@ -15,12 +16,15 @@ interface FlightDetailCardProps {
   onClose: () => void;
   positions?: Map<string, "КВС" | "2П">;
   typeSummary?: FlightTypeSummary;
+  airportAverages?: AirportAverages;
   onSelectPilot?: (code: string, aircraftType: string) => void;
 }
 
 // Полоса показывает, где значение рейса внутри диапазона по типу ВС. Цветом здесь не судим:
 // красный только за норматив из матрицы, диапазон — просто контекст.
-function MetricRange({ value, min, max, avg, alert }: { value: number; min: number; max: number; avg: number | null; alert: boolean }) {
+// Три дорожки, чтобы силуэты не наезжали друг на друга: вышка аэропорта — над полосой,
+// значение рейса — на самой полосе, среднее по типу ВС — под полосой.
+function MetricRange({ value, min, max, avg, airport, alert }: { value: number; min: number; max: number; avg: number | null; airport: number | null; alert: boolean }) {
   const span = max - min;
   if (!(span > 0)) return null;
   const at = (point: number) => Math.min(100, Math.max(0, ((point - min) / span) * 100));
@@ -28,15 +32,20 @@ function MetricRange({ value, min, max, avg, alert }: { value: number; min: numb
   return (
     <div className="fd-range" aria-hidden="true">
       <span className="fd-range-track" />
-      {avg !== null && <span className="fd-range-avg" style={{ left: `${at(avg)}%` }} />}
+      {airport !== null && (
+        <span className="fd-marker is-airport" style={{ left: `${at(airport)}%` }}><MarkerGlyph kind="airport" size={13} /></span>
+      )}
+      {avg !== null && (
+        <span className="fd-marker is-type" style={{ left: `${at(avg)}%` }}><MarkerGlyph kind="plane" /></span>
+      )}
       {outside
         ? <span className={`fd-range-edge${outside === "high" ? " is-high" : ""}`} />
-        : <span className={`fd-range-dot${alert ? " is-alert" : ""}`} style={{ left: `${at(value)}%` }} />}
+        : <span className={`fd-marker is-flight${alert ? " is-alert" : ""}`} style={{ left: `${at(value)}%` }}><MarkerGlyph kind="pilot" halo /></span>}
     </div>
   );
 }
 
-export function FlightDetailCard({ flight, onClose, positions, typeSummary, onSelectPilot }: FlightDetailCardProps) {
+export function FlightDetailCard({ flight, onClose, positions, typeSummary, airportAverages, onSelectPilot }: FlightDetailCardProps) {
   const identity = [formatFlightDate(flight.date), flight.aircraftType, flight.board].filter(Boolean).join(" · ");
   // Уровни отклонений по матрице нормативов: одно событие может отвечать сразу двум нормативам.
   const deviations = flight.events.map((event) => classifyEventAll(event, flight.aircraftType, deviationMatrix));
@@ -106,7 +115,11 @@ export function FlightDetailCard({ flight, onClose, positions, typeSummary, onSe
           <section>
             <h3 className="fd-block-title">
               Параметры полёта
-              {typeSummary && <span className="fd-block-note">точка — этот рейс, штрих — среднее по типу {flight.aircraftType}</span>}
+              {typeSummary && (
+                <span className="fd-block-note">
+                  <MarkerGlyph kind="pilot" /> этот рейс · <MarkerGlyph kind="plane" /> среднее по типу {flight.aircraftType} · <MarkerGlyph kind="airport" size={13} /> среднее по аэропорту
+                </span>
+              )}
             </h3>
             <div className="fd-metrics">
               {metricDefinitions.map((metric) => {
@@ -117,9 +130,16 @@ export function FlightDetailCard({ flight, onClose, positions, typeSummary, onSe
                 const min = typeSummary?.minMetrics[metric.key] ?? null;
                 const max = typeSummary?.maxMetrics[metric.key] ?? null;
                 const avg = typeSummary?.metrics[metric.key] ?? null;
-                const hint = min !== null && max !== null
+                // Для тангажа сравниваем с аэропортом вылета, для посадочных показателей — с аэропортом посадки.
+                const airport: AirportAverage | null = metric.airportScope ? airportAverageFor(airportAverages, flight, metric.airportScope) : null;
+                const airportValue = airport?.metrics[metric.key] ?? null;
+                const typeHint = min !== null && max !== null
                   ? `Тип ${flight.aircraftType}: ${formatMetric(min, metric.key)} – ${formatMetric(max, metric.key, true)}, среднее ${formatMetric(avg, metric.key, true)}`
-                  : undefined;
+                  : null;
+                const airportHint = airport && airportValue !== null
+                  ? `${airport.airport} (${airport.aircraftType}, рейсов: ${airport.flights}): среднее ${formatMetric(airportValue, metric.key, true)}`
+                  : null;
+                const hint = [typeHint, airportHint].filter(Boolean).join(" · ") || undefined;
                 return (
                   <div className="fd-metric" key={metric.key} title={hint}>
                     <div className="fd-metric-top">
@@ -130,7 +150,7 @@ export function FlightDetailCard({ flight, onClose, positions, typeSummary, onSe
                       </span>
                     </div>
                     {value !== null && min !== null && max !== null && (
-                      <MetricRange value={value} min={min} max={max} avg={avg} alert={alert} />
+                      <MetricRange value={value} min={min} max={max} avg={avg} airport={airportValue} alert={alert} />
                     )}
                   </div>
                 );

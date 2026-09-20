@@ -1,13 +1,17 @@
+// airportScope — какой аэропорт сравнивать с показателем в карточке рейса: тангаж
+// на отрыве принадлежит аэропорту вылета, посадочные показатели — аэропорту посадки,
+// а эшелон не привязан ни к одному из них.
 export const metricDefinitions = [
-  { key: "takeoffPitch", label: "Тангаж на отрыве", shortLabel: "Тангаж", unit: "°", digits: 2 },
-  { key: "flightLevel", label: "Эшелон полёта", shortLabel: "Эшелон", unit: "ft", digits: 0 },
-  { key: "glideslopeEntrySpeed", label: "Скорость входа в глиссаду", shortLabel: "Вход в глиссаду", unit: "уз", digits: 1 },
-  { key: "autopilotDisconnectHeight", label: "Высота отключения автопилота", shortLabel: "Откл. АП", unit: "ft", digits: 0 },
-  { key: "touchdownDistance", label: "Пролёт от торца до касания", shortLabel: "До касания", unit: "м", digits: 0 },
-  { key: "thresholdToTouchdownTime", label: "Время от торца до касания", shortLabel: "Время", unit: "с", digits: 1 },
-  { key: "landingNy", label: "Ny на посадке", shortLabel: "Ny", unit: "g", digits: 3 },
-  { key: "reverseOffSpeed", label: "Скорость выключения реверса", shortLabel: "Реверс выкл.", unit: "уз", digits: 1 },
+  { key: "takeoffPitch", label: "Тангаж на отрыве", shortLabel: "Тангаж", unit: "°", digits: 2, airportScope: "departure" },
+  { key: "flightLevel", label: "Эшелон полёта", shortLabel: "Эшелон", unit: "ft", digits: 0, airportScope: null },
+  { key: "glideslopeEntrySpeed", label: "Скорость входа в глиссаду", shortLabel: "Вход в глиссаду", unit: "уз", digits: 1, airportScope: "arrival" },
+  { key: "autopilotDisconnectHeight", label: "Высота отключения автопилота", shortLabel: "Откл. АП", unit: "ft", digits: 0, airportScope: "arrival" },
+  { key: "touchdownDistance", label: "Пролёт от торца до касания", shortLabel: "До касания", unit: "м", digits: 0, airportScope: "arrival" },
+  { key: "thresholdToTouchdownTime", label: "Время от торца до касания", shortLabel: "Время", unit: "с", digits: 1, airportScope: "arrival" },
+  { key: "landingNy", label: "Ny на посадке", shortLabel: "Ny", unit: "g", digits: 3, airportScope: "arrival" },
+  { key: "reverseOffSpeed", label: "Скорость выключения реверса", shortLabel: "Реверс выкл.", unit: "уз", digits: 1, airportScope: "arrival" },
 ] as const;
+export type AirportScope = "departure" | "arrival";
 export type FlightMetricKey = typeof metricDefinitions[number]["key"];
 
 // Жёстких порогов здесь больше нет: пределы по показателям рейса берутся из матрицы
@@ -460,6 +464,36 @@ export function summarizeFlights(flights: Flight[], groupBy: "aircraftType" | "d
     const labelB = String(b.label || "");
     return labelA.localeCompare(labelB, "ru");
   });
+}
+
+// Средние по аэропорту считаем в разрезе типа ВС: полоса в карточке рейса построена
+// по диапазону типа, и среднее «по всем типам сразу» на ней означало бы другую шкалу.
+export type AirportAverage = { airport: string; aircraftType: string; flights: number; metrics: Metrics };
+export type AirportAverages = Record<AirportScope, Map<string, AirportAverage>>;
+
+const airportKey = (airport: string, aircraftType: string) => `${airport}\u0000${aircraftType}`;
+
+export function buildAirportAverages(flights: Flight[]): AirportAverages {
+  const collect = (scope: AirportScope) => {
+    const groups = new Map<string, { airport: string; aircraftType: string; items: Flight[] }>();
+    for (const flight of flights) {
+      const key = airportKey(flight[scope], flight.aircraftType);
+      const group = groups.get(key);
+      if (group) group.items.push(flight);
+      else groups.set(key, { airport: flight[scope], aircraftType: flight.aircraftType, items: [flight] });
+    }
+    return new Map([...groups].map(([key, group]) => [key, {
+      airport: group.airport,
+      aircraftType: group.aircraftType,
+      flights: group.items.length,
+      metrics: metricSet(group.items).metrics,
+    }]));
+  };
+  return { departure: collect("departure"), arrival: collect("arrival") };
+}
+
+export function airportAverageFor(averages: AirportAverages | undefined, flight: Flight, scope: AirportScope) {
+  return averages?.[scope].get(airportKey(flight[scope], flight.aircraftType)) ?? null;
 }
 
 export function formatMetric(value: number | null, key: FlightMetricKey, withUnit = false) {

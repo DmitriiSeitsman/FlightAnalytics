@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { formatMetric, type FlightMetricKey, type HistogramBin, type MultiHistogramBin, type StatisticRow } from "./flight-data";
+import { PILOT_BODY_PATH, PILOT_HEAD_PATH, PLANE_PATH } from "./marker-icons";
 
 const NAVY = "#183964";
 const RED = "#d52238";
@@ -493,9 +494,6 @@ const PROFILE_BAND_H = 6;
 // Силуэты в системе координат 24x24: самолёт помечает среднее по типу ВС, фигура человека — среднее пилота.
 const PROFILE_ICON = 16;
 const PROFILE_ICON_GAP = 4;
-const PLANE_PATH = "M12 1.6C13 1.6 13.9 3 13.9 4.6L13.9 8.2L22.4 13.3L22.4 15.4L13.9 12.9L13.9 17.6L16.5 19.5L16.5 21.1L12 19.9L7.5 21.1L7.5 19.5L10.1 17.6L10.1 12.9L1.6 15.4L1.6 13.3L10.1 8.2L10.1 4.6C10.1 3 11 1.6 12 1.6Z";
-const PILOT_HEAD_PATH = "M12 3.2C14.6 3.2 16.8 5.4 16.8 8.1C16.8 10.8 14.6 13 12 13C9.4 13 7.2 10.8 7.2 8.1C7.2 5.4 9.4 3.2 12 3.2Z";
-const PILOT_BODY_PATH = "M12 14.6C17 14.6 21.2 17.9 21.2 22H2.8C2.8 17.9 7 14.6 12 14.6Z";
 
 const PROFILE_TRACK_FILL = "#e8eef9";
 

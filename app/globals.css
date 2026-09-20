@@ -335,19 +335,31 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 .fd-metric-top b.is-alert { color: var(--red); }
 
 /* Полоса — диапазон по типу ВС, точка — этот рейс, штрих — среднее по типу. */
-.fd-range { position: relative; height: 12px; margin-top: 7px; }
+/* Три дорожки маркеров: аэропорт сверху, значение рейса на полосе, тип ВС снизу.
+   Дорожки фиксированные — иконки не могут наехать друг на друга, как бы близко
+   ни оказались значения. */
+.fd-range { position: relative; height: 38px; margin-top: 4px; }
 
-.fd-range-track { position: absolute; top: 4px; right: 0; left: 0; height: 4px; border-radius: 99px; background: #e3e9ef; }
+.fd-range-track { position: absolute; top: 16px; right: 0; left: 0; height: 4px; border-radius: 99px; background: #e3e9ef; }
 
-.fd-range-avg { position: absolute; top: 1px; width: 2px; height: 10px; border-radius: 1px; background: var(--navy); opacity: 0.45; transform: translateX(-1px); }
+.fd-marker { position: absolute; line-height: 0; transform: translateX(-50%); color: var(--navy); }
 
-.fd-range-dot { position: absolute; top: 1px; width: 10px; height: 10px; border: 2px solid white; border-radius: 50%; background: var(--navy); transform: translateX(-5px); }
+.fd-marker svg { display: block; }
 
-.fd-range-dot.is-alert { background: var(--red); }
+.fd-marker.is-airport { top: 0; color: #7d8e9c; }
 
-.fd-range-edge { position: absolute; top: 2px; left: -1px; width: 0; height: 0; border-top: 4px solid transparent; border-right: 7px solid #8c9aa6; border-bottom: 4px solid transparent; }
+.fd-marker.is-flight { top: 12px; }
+
+.fd-marker.is-flight.is-alert { color: var(--red); }
+
+.fd-marker.is-type { top: 25px; opacity: 0.5; }
+
+.fd-range-edge { position: absolute; top: 14px; left: -1px; width: 0; height: 0; border-top: 4px solid transparent; border-right: 7px solid #8c9aa6; border-bottom: 4px solid transparent; }
 
 .fd-range-edge.is-high { right: -1px; left: auto; border-right: 0; border-left: 7px solid #8c9aa6; }
+
+/* Подпись блока: те же силуэты, что на полосах, поэтому выравниваем их по тексту. */
+.fd-block-note svg { display: inline-block; vertical-align: -2px; color: var(--navy); opacity: 0.75; }
 
 .flight-detail-events {
   display: flex;

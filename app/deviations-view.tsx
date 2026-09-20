@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { formatFlightDate, normalizeFlightDate, shortenPilotName, summarizeFlights, type Flight } from "./flight-data";
+import { buildAirportAverages, formatFlightDate, normalizeFlightDate, shortenPilotName, summarizeFlights, type Flight } from "./flight-data";
 import { COLOR_LABELS, COLOR_STYLES } from "./events-analytics";
 import { FlightDetailCard, type FlightTypeSummary } from "./flight-detail-card";
 import { DeviationBadge } from "./deviations/badge";
@@ -64,6 +64,7 @@ export function DeviationsView({ flights, positions, onSelectPilot }: Deviations
     () => new Map<string, FlightTypeSummary>(summarizeFlights(flights, "aircraftType").map((item) => [item.label, item])),
     [flights],
   );
+  const airportAverages = useMemo(() => buildAirportAverages(flights), [flights]);
 
   const entries = useMemo(() => {
     const collected = collectDeviations(flights, deviationMatrix);
@@ -343,6 +344,7 @@ export function DeviationsView({ flights, positions, onSelectPilot }: Deviations
         onClose={() => setSelectedFlight(null)}
         positions={positions}
         typeSummary={typeSummaries.get(selectedFlight.aircraftType)}
+        airportAverages={airportAverages}
         onSelectPilot={onSelectPilot && ((code, type) => { setSelectedFlight(null); onSelectPilot(code, type); })}
       />}
     </div>
