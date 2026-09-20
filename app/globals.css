@@ -25,7 +25,7 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 .result-strip { display:grid; grid-template-columns:repeat(3,minmax(130px,.5fr)) 1fr; align-items:center; gap:18px; margin-top:20px; padding:20px 24px; border:1px solid #b9d9cb; border-radius:15px; background:#edf8f3; }.result-strip div span,.filters label>span,.pilot-controls label>span,.filters>div>span { display:block; color:#63717d; font-size:9px; font-weight:900; letter-spacing:.065em; text-transform:uppercase; }.result-strip div strong { display:block; margin-top:4px; color:var(--green); font-size:22px; }.result-strip p { margin:0; color:#5d7067; font-size:10px; text-align:right; }
 .filters,.pilot-controls { --picker-height:48px; display:grid; grid-template-columns:repeat(2,minmax(210px,1fr)) minmax(170px,auto); align-items:end; gap:16px; margin-top:20px; padding:22px; border:1px solid #d7dde1; border-radius:18px; background:#fff; box-shadow:0 12px 32px #1027400b; }.filters label,.pilot-controls label { display:grid; min-width:0; gap:8px; }.filters select,.pilot-controls select { appearance:none; width:100%; height:var(--picker-height); padding:0 44px 0 14px; border:1px solid #c7d1d8; border-radius:12px; outline:none; background-color:#f9fbfc; background-image:linear-gradient(45deg,transparent 50%,#607585 50%),linear-gradient(135deg,#607585 50%,transparent 50%),linear-gradient(to right,#dde4e8,#dde4e8); background-position:calc(100% - 19px) 21px,calc(100% - 14px) 21px,calc(100% - 38px) 9px; background-repeat:no-repeat; background-size:5px 5px,5px 5px,1px 30px; color:var(--ink); font-size:12px; font-weight:700; transition:border-color .15s ease,box-shadow .15s ease,background-color .15s ease; }.pilot-controls input { width:100%; height:var(--picker-height); padding:0 14px; border:1px solid #c7d1d8; border-radius:12px; outline:none; background:#f9fbfc; color:var(--ink); font-size:12px; font-weight:700; transition:border-color .15s ease,box-shadow .15s ease,background-color .15s ease; }.filters select:hover,.pilot-controls select:hover,.pilot-controls input:hover { border-color:#9dabb5; background-color:white; }.filters select:focus,.pilot-controls select:focus,.pilot-controls input:focus { border-color:var(--navy); background-color:white; box-shadow:0 0 0 4px #18396412; }.pilot-controls input::placeholder { color:#98a4ad; font-weight:500; }.pilot-controls input[type="number"] { text-align:center; font-variant-numeric:tabular-nums; }.pilot-controls input[type="number"]::-webkit-inner-spin-button { opacity:.55; }.filters>div { display:grid; min-width:170px; min-height:var(--picker-height); align-content:center; gap:4px; padding:7px 14px; border:1px solid #d9e3eb; border-radius:12px; background:#eef4f8; }.filters>div strong { display:block; color:var(--navy); font-size:18px; line-height:1.1; }
 .tabs { display:flex; gap:7px; margin-top:25px; overflow-x:auto; }.tabs button { min-height:42px; padding:0 16px; border:1px solid #cbd3d7; border-radius:10px; cursor:pointer; white-space:nowrap; background:white; color:#536574; font-size:10px; font-weight:800; }.tabs button.active { border-color:var(--navy); background:var(--navy); color:white; }
-.table-shell { margin-top:12px; overflow:auto; overscroll-behavior-inline:contain; -webkit-overflow-scrolling:touch; border:1px solid var(--line); border-radius:16px; background:white; box-shadow:0 10px 30px #1027400b; scrollbar-color:#9aabb6 #edf1f3; scrollbar-width:thin; }.table-shell::-webkit-scrollbar { height:10px; }.table-shell::-webkit-scrollbar-track { background:#edf1f3; }.table-shell::-webkit-scrollbar-thumb { border:2px solid #edf1f3; border-radius:999px; background:#9aabb6; } table { width:100%; min-width:1350px; border-collapse:collapse; table-layout:auto; font-size:11px; font-variant-numeric:tabular-nums; } th,td { padding:14px 12px; border-bottom:1px solid #e5e9ea; text-align:right; white-space:nowrap; } thead th { min-width:0; padding:0; background:#f3f6f7; color:#687985; font-size:8px; letter-spacing:.04em; text-transform:uppercase; } table:not(.pilot-table) thead th:nth-child(2) { min-width:112px; } table:not(.pilot-table) thead th:nth-child(3) { min-width:122px; } table:not(.pilot-table) thead th:nth-child(4) { min-width:126px; } table:not(.pilot-table) thead th:nth-child(5) { min-width:160px; } table:not(.pilot-table) thead th:nth-child(6) { min-width:152px; } table:not(.pilot-table) thead th:nth-child(7) { min-width:142px; } table:not(.pilot-table) thead th:nth-child(8) { min-width:126px; } table:not(.pilot-table) thead th:nth-child(9) { min-width:112px; } table:not(.pilot-table) thead th:nth-child(10) { min-width:152px; } th:first-child { position:sticky; left:0; z-index:1; width:1%; min-width:0; background:white; color:#26435b; text-align:left; } thead th:first-child { z-index:2; background:#f3f6f7; } thead th small,.pilot-table th small { display:block; margin-top:3px; color:#99a5ad; font-size:8px; } tbody tr:hover td,tbody tr:hover th { background:#f9fbfb; }.pilot-table { min-width:1180px; }.pilot-table thead th { min-width:118px; }.pilot-table thead th:first-child { min-width:0; }.delta { color:var(--navy); font-weight:800; }
+.table-shell { margin-top:12px; overflow:auto; overscroll-behavior-inline:contain; -webkit-overflow-scrolling:touch; border:1px solid var(--line); border-radius:16px; background:white; box-shadow:0 10px 30px #1027400b; scrollbar-color:#9aabb6 #edf1f3; scrollbar-width:thin; }.table-shell::-webkit-scrollbar { height:10px; }.table-shell::-webkit-scrollbar-track { background:#edf1f3; }.table-shell::-webkit-scrollbar-thumb { border:2px solid #edf1f3; border-radius:999px; background:#9aabb6; } table { width:100%; min-width:1350px; border-collapse:collapse; table-layout:auto; font-size:11px; font-variant-numeric:tabular-nums; } th,td { padding:14px 12px; border-bottom:1px solid #e5e9ea; text-align:right; white-space:nowrap; } thead th { min-width:0; padding:0; background:#f3f6f7; color:#687985; font-size:8px; letter-spacing:.04em; text-transform:uppercase; } table:not(.pilot-table):not(.data-table) thead th:nth-child(2) { min-width:112px; } table:not(.pilot-table):not(.data-table) thead th:nth-child(3) { min-width:122px; } table:not(.pilot-table):not(.data-table) thead th:nth-child(4) { min-width:126px; } table:not(.pilot-table):not(.data-table) thead th:nth-child(5) { min-width:160px; } table:not(.pilot-table):not(.data-table) thead th:nth-child(6) { min-width:152px; } table:not(.pilot-table):not(.data-table) thead th:nth-child(7) { min-width:142px; } table:not(.pilot-table):not(.data-table) thead th:nth-child(8) { min-width:126px; } table:not(.pilot-table):not(.data-table) thead th:nth-child(9) { min-width:112px; } table:not(.pilot-table):not(.data-table) thead th:nth-child(10) { min-width:152px; } th:first-child { position:sticky; left:0; z-index:1; width:1%; min-width:0; background:white; color:#26435b; text-align:left; } thead th:first-child { z-index:2; background:#f3f6f7; } thead th small,.pilot-table th small { display:block; margin-top:3px; color:#99a5ad; font-size:8px; } tbody tr:hover td,tbody tr:hover th { background:#f9fbfb; }.pilot-table { min-width:1180px; }.pilot-table thead th { min-width:118px; }.pilot-table thead th:first-child { min-width:0; }.delta { color:var(--navy); font-weight:800; }
 .sort-help { margin:10px 2px 0; color:#74818a; font-size:10px; line-height:1.45; }.mobile-table-hint { display:none; }.sort-label { display:grid; width:100%; min-height:70px; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:7px; padding:8px 9px; background:transparent; color:inherit; text-align:right; transition:background .15s ease,color .15s ease; }.sort-label.active { background:#e8eef1; color:var(--navy); }.sort-label label { display:flex; min-height:50px; align-items:center; justify-content:flex-end; gap:8px; cursor:pointer; }.sort-label label>span { display:block; min-width:0; white-space:normal; overflow-wrap:anywhere; line-height:1.3; }.sort-label input { appearance:none; display:grid; width:17px; height:17px; margin:0; flex:0 0 auto; place-items:center; border:1px solid #aebbc4; border-radius:5px; cursor:pointer; background:white; transition:border-color .15s ease,background-color .15s ease,box-shadow .15s ease; }.sort-label input::after { content:""; width:8px; height:5px; border-left:2px solid white; border-bottom:2px solid white; opacity:0; transform:translateY(-1px) rotate(-45deg); }.sort-label input:hover { border-color:var(--navy); }.sort-label input:focus-visible { outline:none; box-shadow:0 0 0 3px #1839641f; }.sort-label input:checked { border-color:var(--red); background:var(--red); }.sort-label input:checked::after { opacity:1; }.sort-priority { display:grid; width:20px; height:20px; place-items:center; border-radius:7px; background:var(--navy); color:white; font-size:8px; font-weight:900; }.sort-arrow { display:grid; width:28px; height:28px; padding:0; place-items:center; border:1px solid #c8d2d8; border-radius:8px; cursor:pointer; background:white; color:var(--red); font-size:12px; font-weight:900; transition:border-color .15s ease,background .15s ease,color .15s ease; }.sort-arrow:hover:not(:disabled) { border-color:var(--navy); background:var(--navy); color:white; }.sort-arrow:disabled { cursor:default; opacity:.3; }.table-shell thead th:first-child .sort-label { text-align:left; }.table-shell thead th:first-child .sort-label label { justify-content:flex-start; }
 
 /* Заголовки столбцов не переносим: колонка подстраивается под ширину заголовка. Иначе
@@ -711,13 +711,9 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 
 .flights-view-row { cursor: pointer; }
 
-.flights-view-flight-cell { text-align: left; white-space: normal; }
-.flights-view-flight-cell strong { display: block; font-size: 12px; color: var(--ink); }
 
-.flights-view-crew { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; font-size: 10px; color: #63717d; white-space: nowrap; }
 .flights-view-crew-empty { font-style: italic; color: #98a4ad; }
 
-.flights-view-table thead th:nth-child(2) { min-width: 220px; }
 
 @media (max-width:1000px) { .report-metric-grid { grid-template-columns:repeat(2,minmax(160px,1fr)); } }
 @media (max-width:800px) { .privacy { display:none; }.hero { padding-bottom:62px; }.hero-copy { margin-top:54px; }.feature-grid,.result-strip,.filters,.pilot-controls,.stats-controls,.stats-callout,.export-row,.comparison-picker-fields { grid-template-columns:1fr; }.export-row { flex-direction:column; align-items:stretch; }.result-strip p { text-align:left; }.workspace { width:min(100% - 24px,1460px); }.upload { justify-content:flex-start; }.processing { grid-template-columns:1fr; gap:18px; padding:24px 18px; }.processing-visual { width:104px; height:104px; }.processing-copy { grid-template-columns:1fr auto; }.processing ol { grid-template-columns:repeat(2,1fr); }.mobile-table-hint { display:block; margin-top:7px; color:var(--navy); font-weight:800; }.table-shell { border-radius:13px; }.table-shell th:first-child { box-shadow:8px 0 14px -14px #10274080; }.chart-head,.chart-legend { flex-direction:column; }.stats-participants article+article { border-left:0; border-top-width:4px; }.comparison-chip { width:100%; max-width:none; }.chart-card { padding-inline:14px; }.comparison-picker { padding:16px; }.report-settings-head { flex-direction:column; }.report-settings-head>div:last-child { width:100%; }.report-settings-head button { flex:1; }.report-metric-grid { grid-template-columns:1fr; } }
@@ -870,3 +866,85 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 .deviation-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 
 .fd-metric-value { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ── Таблица данных ───────────────────────────────────────────────────────────
+   Заголовок — кнопка сортировки со своими отступами (глобальное thead th
+   обнуляет padding ради таблиц с чекбоксами, здесь он возвращается).
+   Шапка и первая колонка залипают: строк на странице полсотни, а колонок девять. */
+.data-table { min-width: 1040px; font-size: 11.5px; }
+.data-table th.is-center, .data-table td.is-center { text-align: center; }
+.data-table th, .data-table td { padding: 11px 12px; text-align: right; }
+.data-table th.is-left, .data-table td.is-left { text-align: left; }
+.data-table thead th { position: sticky; top: 0; z-index: 3; padding: 0; box-shadow: inset 0 -1px 0 #dde4e7; }
+.data-table thead th:first-child { z-index: 4; }
+
+.data-table .data-sort {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 13px 12px;
+  border: 0;
+  background: none;
+  color: #687985;
+  font: inherit;
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.data-table th.is-left .data-sort { justify-content: flex-start; }
+.data-table .data-sort svg { flex: 0 0 auto; opacity: 0; transition: opacity 0.15s ease, transform 0.15s ease; }
+.data-table .data-sort:hover { color: var(--navy); background: #e9eef1; }
+.data-table .data-sort:hover svg { opacity: 0.4; }
+.data-table .data-sort:focus-visible { outline: 2px solid var(--navy); outline-offset: -2px; }
+.data-table .data-sort.is-active { color: var(--navy); background: #e5ebef; }
+.data-table .data-sort.is-active svg { opacity: 1; }
+.data-table .data-sort.is-asc svg { transform: rotate(180deg); }
+.data-table thead th.is-plain {
+  padding: 13px 12px;
+  color: #687985;
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.data-table tbody tr { transition: background 0.12s ease; }
+.data-table tbody tr:hover td, .data-table tbody tr:hover th { background: #f4f9fb; }
+.data-table tbody tr:focus-visible { outline: 2px solid var(--navy); outline-offset: -2px; }
+.data-table tbody tr:focus-visible td, .data-table tbody tr:focus-visible th { background: #f4f9fb; }
+.data-table .is-muted { color: #b4bfc6; }
+
+/* Рейсы: полоса слева по худшему цвету события, экипаж отдельной колонкой.
+   Колонки держат ширину по содержимому, а свободное место забирают маршрут
+   и экипаж — иначе время и борт расползаются на пол-экрана. */
+.flights-view .table-shell { max-height: min(72vh, 780px); }
+.flights-view-table th, .flights-view-table td { width: 1%; white-space: nowrap; }
+.flights-view-table th:nth-child(3), .flights-view-table td:nth-child(3) { width: 100%; }
+.flights-view-table tbody th, .flights-view-table tbody td { height: 58px; }
+.flights-date-cell { font-weight: 700; color: var(--ink); }
+.flights-number-cell strong { font-size: 12.5px; font-weight: 800; color: var(--ink); letter-spacing: 0.01em; }
+.flights-board-cell { color: #4f5d68; }
+.flights-crew-cell { white-space: nowrap; }
+.flights-crew-cell span { display: flex; align-items: center; gap: 6px; color: #4f5d68; font-size: 10.5px; line-height: 1.7; }
+.flights-crew-cell i {
+  display: inline-grid;
+  min-width: 26px;
+  padding: 1px 5px;
+  place-items: center;
+  border-radius: 5px;
+  background: #fdeaec;
+  color: var(--red);
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+.flights-crew-cell i.is-second { background: #e7f4ef; color: var(--green); }
+.flights-crew-cell b { color: #97a3ab; font-weight: 600; }
+.flights-view-crew-empty { color: #a8b3ba; font-style: italic; }

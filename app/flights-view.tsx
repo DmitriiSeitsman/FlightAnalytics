@@ -14,6 +14,19 @@ interface FlightsViewProps {
 type FlightsSortKey = "date" | "flightNumber" | "route" | "departureTime" | "arrivalTime" | "board" | "aircraftType";
 type SortDirection = "asc" | "desc";
 
+// Заголовок-кнопка: стрелка всегда на месте и не дёргает ширину колонки при сортировке.
+function SortHeader({ label, columnKey, sort, onSort, left }: { label: string; columnKey: FlightsSortKey; sort: { key: FlightsSortKey; direction: SortDirection }; onSort: (key: FlightsSortKey) => void; left?: boolean }) {
+  const active = sort.key === columnKey;
+  return (
+    <th scope="col" className={left ? "is-left" : undefined} aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
+      <button type="button" className={`data-sort${active ? " is-active" : ""}${active && sort.direction === "asc" ? " is-asc" : ""}`} onClick={() => onSort(columnKey)}>
+        <span>{label}</span>
+        <svg viewBox="0 0 10 6" width="9" height="6" aria-hidden="true"><path d="M1 1.3 L5 4.7 L9 1.3" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </button>
+    </th>
+  );
+}
+
 export function FlightsView({ flights, positions, onSelectPilot }: FlightsViewProps) {
   // Диапазоны по типам ВС для полос в карточке рейса: считаем один раз на всю выборку.
   const typeSummaries = useMemo(
@@ -70,8 +83,6 @@ export function FlightsView({ flights, positions, onSelectPilot }: FlightsViewPr
     setCurrentPage(1);
   };
 
-  const sortArrow = (key: FlightsSortKey) => (sort.key === key ? (sort.direction === "asc" ? "↑" : "↓") : "");
-
   if (!flights.length) {
     return (
       <div className="events-analytics-empty">
@@ -101,17 +112,18 @@ export function FlightsView({ flights, positions, onSelectPilot }: FlightsViewPr
         <p className="events-analytics-empty-filter">Рейсы по запросу не найдены.</p>
       ) : (
         <div className="table-shell">
-          <table className="flights-view-table">
+          <table className="data-table flights-view-table">
             <thead>
               <tr>
-                <th onClick={() => handleSort("date")} className={sort.key === "date" ? "active" : ""}>Дата {sortArrow("date")}</th>
-                <th onClick={() => handleSort("flightNumber")} className={sort.key === "flightNumber" ? "active" : ""}>Рейс {sortArrow("flightNumber")}</th>
-                <th onClick={() => handleSort("route")} className={sort.key === "route" ? "active" : ""}>Маршрут {sortArrow("route")}</th>
-                <th onClick={() => handleSort("departureTime")} className={sort.key === "departureTime" ? "active" : ""}>Вылет {sortArrow("departureTime")}</th>
-                <th onClick={() => handleSort("arrivalTime")} className={sort.key === "arrivalTime" ? "active" : ""}>Посадка {sortArrow("arrivalTime")}</th>
-                <th onClick={() => handleSort("board")} className={sort.key === "board" ? "active" : ""}>Борт {sortArrow("board")}</th>
-                <th onClick={() => handleSort("aircraftType")} className={sort.key === "aircraftType" ? "active" : ""}>Тип ВС {sortArrow("aircraftType")}</th>
-                <th>События</th>
+                <SortHeader label="Дата" columnKey="date" sort={sort} onSort={handleSort} left />
+                <SortHeader label="Рейс" columnKey="flightNumber" sort={sort} onSort={handleSort} left />
+                <SortHeader label="Маршрут" columnKey="route" sort={sort} onSort={handleSort} left />
+                <SortHeader label="Вылет" columnKey="departureTime" sort={sort} onSort={handleSort} />
+                <SortHeader label="Посадка" columnKey="arrivalTime" sort={sort} onSort={handleSort} />
+                <SortHeader label="Борт" columnKey="board" sort={sort} onSort={handleSort} left />
+                <SortHeader label="Тип ВС" columnKey="aircraftType" sort={sort} onSort={handleSort} left />
+                <th scope="col" className="is-plain is-left">Экипаж</th>
+                <th scope="col" className="is-plain is-center">События</th>
               </tr>
             </thead>
             <tbody>
@@ -120,29 +132,41 @@ export function FlightsView({ flights, positions, onSelectPilot }: FlightsViewPr
                 const stripeStyle = eventColor ? { boxShadow: `inset 4px 0 0 ${COLOR_STYLES[eventColor].text}` } : undefined;
                 const captain = flight.crew.find((member) => member.role === "CM1");
                 const copilot = flight.crew.find((member) => member.role === "CM2");
+                const dash = <span className="is-muted">—</span>;
                 return (
-                  <tr key={`${flight.key}-${index}`} className="flights-view-row" onClick={() => setSelectedFlight(flight)}>
-                    <td style={stripeStyle}>{formatFlightDate(flight.date)}</td>
-                    <td className="flights-view-flight-cell">
-                      <strong>{flight.flightNumber || "—"}</strong>
-                      <div className="flights-view-crew">
-                        {captain && <span>КВС: {shortenPilotName(captain.name)} · {captain.code}</span>}
-                        {copilot && <span>2П: {shortenPilotName(copilot.name)} · {copilot.code}</span>}
-                        {!captain && !copilot && <span className="flights-view-crew-empty">Экипаж не указан</span>}
-                      </div>
-                    </td>
-                    <td className="route-cell">
+                  <tr
+                    key={`${flight.key}-${index}`}
+                    className="flights-view-row"
+                    tabIndex={0}
+                    aria-label={`Рейс ${flight.flightNumber || ""} ${formatFlightDate(flight.date)}, ${flight.departure} — ${flight.arrival}`}
+                    onClick={() => setSelectedFlight(flight)}
+                    onKeyDown={(keyEvent) => {
+                      if (keyEvent.key !== "Enter" && keyEvent.key !== " ") return;
+                      keyEvent.preventDefault();
+                      setSelectedFlight(flight);
+                    }}
+                  >
+                    <th scope="row" className="is-left flights-date-cell" style={stripeStyle} title={eventColor ? summarizeEventColors(flight.events, COLOR_LABELS) : undefined}>
+                      {formatFlightDate(flight.date)}
+                    </th>
+                    <td className="is-left flights-number-cell"><strong>{flight.flightNumber || "—"}</strong></td>
+                    <td className="is-left route-cell">
                       <span className="route-content">
                         <span className="route-departure">{flight.departure}</span>
-                        <span className="route-arrow">→</span>
+                        <span className="route-arrow" aria-hidden="true">→</span>
                         <span className="route-arrival">{flight.arrival}</span>
                       </span>
                     </td>
-                    <td>{flight.departureTime || "—"}</td>
-                    <td>{flight.arrivalTime || "—"}</td>
-                    <td>{flight.board || "—"}</td>
-                    <td>{flight.aircraftType}</td>
-                    <td>
+                    <td>{flight.departureTime || dash}</td>
+                    <td>{flight.arrivalTime || dash}</td>
+                    <td className="is-left flights-board-cell">{flight.board || dash}</td>
+                    <td className="is-left">{flight.aircraftType || dash}</td>
+                    <td className="is-left flights-crew-cell">
+                      {captain && <span><i>КВС</i>{shortenPilotName(captain.name)}<b>{captain.code}</b></span>}
+                      {copilot && <span><i className="is-second">2П</i>{shortenPilotName(copilot.name)}<b>{copilot.code}</b></span>}
+                      {!captain && !copilot && <span className="flights-view-crew-empty">Экипаж не указан</span>}
+                    </td>
+                    <td className="is-center">
                       {eventColor ? (
                         <span
                           className="event-flight-badge"
@@ -151,7 +175,7 @@ export function FlightsView({ flights, positions, onSelectPilot }: FlightsViewPr
                         >
                           {flight.events.length}
                         </span>
-                      ) : "—"}
+                      ) : dash}
                     </td>
                   </tr>
                 );
