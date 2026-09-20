@@ -136,7 +136,7 @@ export function FlightDetailCard({ flight, onClose, positions, typeSummary, airp
                       <b>Среднее по аэропорту</b> — только по рейсам того же типа ВС в этом аэропорту.
                       {departureAverage && <> Тангаж на отрыве — аэропорт вылета ({departureAverage.airport}, {formatFlightCount(departureAverage.flights)}).</>}
                       {arrivalAverage && <> Посадочные показатели — аэропорт посадки ({arrivalAverage.airport}, {formatFlightCount(arrivalAverage.flights)}).</>}
-                      {" "}У эшелона полёта аэропорта нет, поэтому на его полосе только два маркера.
+                      {" "}Эшелон полёта сравнивается только со средним по типу ВС.
                     </span>
                   </li>
                 )}
