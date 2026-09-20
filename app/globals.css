@@ -358,8 +358,18 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 
 .fd-range-edge.is-high { right: -1px; left: auto; border-right: 0; border-left: 7px solid #8c9aa6; }
 
-/* Подпись блока: те же силуэты, что на полосах, поэтому выравниваем их по тексту. */
-.fd-block-note svg { display: inline-block; vertical-align: -2px; color: var(--navy); opacity: 0.75; }
+/* Легенда блока показателей: те же силуэты, что на полосах, плюс словами, что чем считается. */
+.fd-legend { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 16px; padding: 11px 13px; border: 1px solid #e5ecf2; border-radius: 10px; background: #f7fafc; list-style: none; font-size: 11.5px; line-height: 1.5; color: #5d6d7a; }
+
+.fd-legend li { display: flex; gap: 9px; align-items: flex-start; }
+
+.fd-legend b { color: var(--navy); font-weight: 600; }
+
+.fd-legend-mark { flex: none; display: flex; justify-content: center; width: 14px; padding-top: 2px; color: var(--navy); }
+
+.fd-legend-mark.is-type { opacity: 0.5; }
+
+.fd-legend-mark.is-airport { color: #7d8e9c; }
 
 .flight-detail-events {
   display: flex;

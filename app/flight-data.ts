@@ -496,6 +496,14 @@ export function airportAverageFor(averages: AirportAverages | undefined, flight:
   return averages?.[scope].get(airportKey(flight[scope], flight.aircraftType)) ?? null;
 }
 
+// 1 рейс, 2 рейса, 5 рейсов — нужно в легенде карточки рейса.
+export function formatFlightCount(count: number) {
+  const tail = count % 100;
+  const last = count % 10;
+  const word = tail >= 11 && tail <= 14 ? "рейсов" : last === 1 ? "рейс" : last >= 2 && last <= 4 ? "рейса" : "рейсов";
+  return `${count.toLocaleString("ru-RU")} ${word}`;
+}
+
 export function formatMetric(value: number | null, key: FlightMetricKey, withUnit = false) {
   if (value === null) return "—";
   const metric = metricDefinitions.find((item) => item.key === key)!;

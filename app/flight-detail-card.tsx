@@ -1,6 +1,6 @@
 "use client";
 
-import { airportAverageFor, formatFlightDate, formatMetric, metricDefinitions, type AirportAverage, type AirportAverages, type Flight, type Metrics } from "./flight-data";
+import { airportAverageFor, formatFlightCount, formatFlightDate, formatMetric, metricDefinitions, type AirportAverages, type Flight, type Metrics } from "./flight-data";
 import { MarkerGlyph } from "./marker-icons";
 import { COLOR_LABELS, COLOR_STYLES } from "./events-analytics";
 import { classifyEventAll, classifyMetric } from "./deviations/classify";
@@ -9,7 +9,9 @@ import { DeviationBadge } from "./deviations/badge";
 import { deviationSummary, displayDeviation, LEVEL_STYLES, worstLevel } from "./deviations/presentation";
 
 // Диапазон по типу ВС для этого рейса: минимум, среднее и максимум по каждому показателю.
-export type FlightTypeSummary = { metrics: Metrics; minMetrics: Metrics; maxMetrics: Metrics };
+// flights — сколько рейсов типа попало в выборку; нужно легенде, чтобы честно сказать,
+// на чём построено среднее.
+export type FlightTypeSummary = { metrics: Metrics; minMetrics: Metrics; maxMetrics: Metrics; flights?: number };
 
 interface FlightDetailCardProps {
   flight: Flight;
@@ -55,6 +57,9 @@ export function FlightDetailCard({ flight, onClose, positions, typeSummary, airp
     if (level !== null) levelCounts.set(level, (levelCounts.get(level) ?? 0) + 1);
   }
   const levels = [4, 3, 2].filter((level) => levelCounts.has(level));
+  // Аэропорты вылета и посадки нужны и легенде, и полосам, поэтому достаём их один раз.
+  const departureAverage = airportAverageFor(airportAverages, flight, "departure");
+  const arrivalAverage = airportAverageFor(airportAverages, flight, "arrival");
 
   return (
     <div className="pilot-card-overlay">
@@ -113,14 +118,30 @@ export function FlightDetailCard({ flight, onClose, positions, typeSummary, airp
           </section>
 
           <section>
-            <h3 className="fd-block-title">
-              Параметры полёта
-              {typeSummary && (
-                <span className="fd-block-note">
-                  <MarkerGlyph kind="pilot" /> этот рейс · <MarkerGlyph kind="plane" /> среднее по типу {flight.aircraftType} · <MarkerGlyph kind="airport" size={13} /> среднее по аэропорту
-                </span>
-              )}
-            </h3>
+            <h3 className="fd-block-title">Параметры полёта</h3>
+            {typeSummary && (
+              <ul className="fd-legend">
+                <li>
+                  <span className="fd-legend-mark"><MarkerGlyph kind="pilot" /></span>
+                  <span><b>Этот рейс</b> — значение из выгрузки. Полоса под ним — диапазон от минимума до максимума по типу {flight.aircraftType}.</span>
+                </li>
+                <li>
+                  <span className="fd-legend-mark is-type"><MarkerGlyph kind="plane" /></span>
+                  <span><b>Среднее по типу {flight.aircraftType}</b> — среднее арифметическое по всем рейсам этого типа в выборке{typeSummary.flights ? ` (${formatFlightCount(typeSummary.flights)})` : ""}.</span>
+                </li>
+                {(departureAverage || arrivalAverage) && (
+                  <li>
+                    <span className="fd-legend-mark is-airport"><MarkerGlyph kind="airport" size={13} /></span>
+                    <span>
+                      <b>Среднее по аэропорту</b> — только по рейсам того же типа ВС в этом аэропорту.
+                      {departureAverage && <> Тангаж на отрыве — аэропорт вылета ({departureAverage.airport}, {formatFlightCount(departureAverage.flights)}).</>}
+                      {arrivalAverage && <> Посадочные показатели — аэропорт посадки ({arrivalAverage.airport}, {formatFlightCount(arrivalAverage.flights)}).</>}
+                      {" "}У эшелона полёта аэропорта нет, поэтому на его полосе только два маркера.
+                    </span>
+                  </li>
+                )}
+              </ul>
+            )}
             <div className="fd-metrics">
               {metricDefinitions.map((metric) => {
                 const value = flight.metrics[metric.key];
@@ -131,7 +152,7 @@ export function FlightDetailCard({ flight, onClose, positions, typeSummary, airp
                 const max = typeSummary?.maxMetrics[metric.key] ?? null;
                 const avg = typeSummary?.metrics[metric.key] ?? null;
                 // Для тангажа сравниваем с аэропортом вылета, для посадочных показателей — с аэропортом посадки.
-                const airport: AirportAverage | null = metric.airportScope ? airportAverageFor(airportAverages, flight, metric.airportScope) : null;
+                const airport = metric.airportScope === "departure" ? departureAverage : metric.airportScope === "arrival" ? arrivalAverage : null;
                 const airportValue = airport?.metrics[metric.key] ?? null;
                 const typeHint = min !== null && max !== null
                   ? `Тип ${flight.aircraftType}: ${formatMetric(min, metric.key)} – ${formatMetric(max, metric.key, true)}, среднее ${formatMetric(avg, metric.key, true)}`

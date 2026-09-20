@@ -60,6 +60,11 @@ export function PilotCard({ pilotRow, flights, onClose, positions, onSelectPilot
 
   // Средние по аэропортам для карточки рейса, открытой из списка рейсов пилота.
   const airportAverages = useMemo(() => buildAirportAverages(flights), [flights]);
+  // Сколько рейсов этого типа в выборке — легенде карточки рейса, чтобы назвать базу среднего.
+  const typeFlightCount = useMemo(
+    () => flights.filter((flight) => flight.aircraftType === pilotRow.aircraftType).length,
+    [flights, pilotRow.aircraftType],
+  );
 
   const dateRange = useMemo(() => {
     const dates = pilotFlights.map((flight) => normalizeFlightDate(flight.date)).filter((date): date is string => Boolean(date));
@@ -489,7 +494,7 @@ export function PilotCard({ pilotRow, flights, onClose, positions, onSelectPilot
       flight={selectedFlight}
       onClose={() => setSelectedFlight(null)}
       positions={positions}
-      typeSummary={{ metrics: pilot.typeMetrics, minMetrics: pilot.typeMinMetrics, maxMetrics: pilot.typeMaxMetrics }}
+      typeSummary={{ metrics: pilot.typeMetrics, minMetrics: pilot.typeMinMetrics, maxMetrics: pilot.typeMaxMetrics, flights: typeFlightCount }}
       airportAverages={airportAverages}
       onSelectPilot={onSelectPilot && ((code, type) => { setSelectedFlight(null); onSelectPilot(code, type); })}
     />}
