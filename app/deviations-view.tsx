@@ -278,16 +278,16 @@ export function DeviationsView({ flights, positions, onSelectPilot }: Deviations
           <p className="events-analytics-empty-filter">Нет отклонений, подходящих под фильтр.</p>
         ) : (
           <div className="table-shell">
-            <table className="events-table deviations-table">
+            <table className="data-table deviations-table">
               <thead>
                 <tr>
-                  <th>Уровень</th>
-                  <th>Цвет</th>
-                  <th>Событие</th>
-                  <th>Дата</th>
-                  <th>Рейс</th>
-                  <th>Маршрут</th>
-                  <th>Экипаж</th>
+                  <th scope="col" className="is-left">Уровень</th>
+                  <th scope="col" className="is-left">Цвет</th>
+                  <th scope="col" className="is-left">Событие</th>
+                  <th scope="col" className="is-left">Дата</th>
+                  <th scope="col" className="is-left">Рейс</th>
+                  <th scope="col" className="is-left">Маршрут</th>
+                  <th scope="col" className="is-left">Экипаж</th>
                 </tr>
               </thead>
               <tbody>
@@ -300,20 +300,20 @@ export function DeviationsView({ flights, positions, onSelectPilot }: Deviations
                       title="Открыть карточку рейса"
                       onClick={() => setSelectedFlight(entry.flight)}
                     >
-                      <td><DeviationBadge display={displayDeviation(entry.classification)} /></td>
-                      <td>
+                      <td className="is-left"><DeviationBadge display={displayDeviation(entry.classification)} /></td>
+                      <td className="is-left">
                         <span className="event-color-badge" style={{ background: style.bg, color: style.text, borderColor: style.border }}>
                           {COLOR_LABELS[entry.event.color]}
                         </span>
                       </td>
-                      <td>
+                      <td className="is-left deviation-event-cell">
                         {entry.event.text}
                         <small className="deviation-rule">{deviationSummary(entry.classification)}</small>
                       </td>
-                      <td>{formatFlightDate(entry.flight.date)}</td>
-                      <td>{entry.flight.flightNumber || "—"}<small>{entry.flight.aircraftType}</small></td>
-                      <td>{entry.flight.departure} → {entry.flight.arrival}</td>
-                      <td>
+                      <td className="is-left">{formatFlightDate(entry.flight.date)}</td>
+                      <td className="is-left">{entry.flight.flightNumber || "—"}<small>{entry.flight.aircraftType}</small></td>
+                      <td className="is-left deviation-route-cell">{entry.flight.departure} → {entry.flight.arrival}</td>
+                      <td className="is-left">
                         {entry.flight.crew.length === 0 ? "—" : entry.flight.crew.map((member) => (
                           <small key={`${member.role}-${member.code}`} className="deviation-crew">
                             <b>{member.role}</b> {shortenPilotName(member.name)}

@@ -122,8 +122,8 @@ export function FlightsView({ flights, positions, onSelectPilot }: FlightsViewPr
                 <SortHeader label="Посадка" columnKey="arrivalTime" sort={sort} onSort={handleSort} />
                 <SortHeader label="Борт" columnKey="board" sort={sort} onSort={handleSort} left />
                 <SortHeader label="Тип ВС" columnKey="aircraftType" sort={sort} onSort={handleSort} left />
-                <th scope="col" className="is-plain is-left">Экипаж</th>
-                <th scope="col" className="is-plain is-center">События</th>
+                <th scope="col" className="is-left">Экипаж</th>
+                <th scope="col" className="is-center">События</th>
               </tr>
             </thead>
             <tbody>

@@ -855,9 +855,26 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 .deviation-report-summary span { color: #63717d; font-weight: 600; }
 .deviation-report-summary strong { font-size: 13px; }
 
+/* Список отклонений: текст события — единственная колонка с переносом, остальные
+   держат ширину по содержимому, свободное место забирает маршрут. */
+.deviations-table { min-width: 1060px; }
+.deviations-table th, .deviations-table td { width: 1%; }
 .deviations-table td { vertical-align: top; }
 .deviations-table td small { display: block; color: #8b98a2; font-size: 10px; }
 .deviations-table .deviation-rule { margin-top: 3px; color: #63717d; }
+.deviations-table thead th:nth-child(3), .deviations-table .deviation-event-cell {
+  /* min-width обязателен: без него колонка с переносом схлопывается,
+     уступая ширину соседней, которая просит 100%. */
+  width: 320px;
+  min-width: 320px;
+  max-width: 320px;
+  white-space: normal;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  line-height: 1.45;
+}
+.deviations-table .deviation-event-cell .deviation-rule { line-height: 1.4; }
+.deviations-table th:nth-child(6), .deviations-table td.deviation-route-cell { width: 100%; }
 .deviation-crew b { color: #4d5a64; }
 .deviation-row { cursor: pointer; }
 .deviation-row:hover { background: #f2f7fa; }
@@ -875,7 +892,19 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 .data-table th.is-center, .data-table td.is-center { text-align: center; }
 .data-table th, .data-table td { padding: 11px 12px; text-align: right; }
 .data-table th.is-left, .data-table td.is-left { text-align: left; }
-.data-table thead th { position: sticky; top: 0; z-index: 3; padding: 0; box-shadow: inset 0 -1px 0 #dde4e7; }
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: 13px 12px;
+  color: #687985;
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  box-shadow: inset 0 -1px 0 #dde4e7;
+}
+.data-table thead th:has(.data-sort) { padding: 0; }
 .data-table thead th:first-child { z-index: 4; }
 
 .data-table .data-sort {
@@ -905,15 +934,6 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 .data-table .data-sort.is-active { color: var(--navy); background: #e5ebef; }
 .data-table .data-sort.is-active svg { opacity: 1; }
 .data-table .data-sort.is-asc svg { transform: rotate(180deg); }
-.data-table thead th.is-plain {
-  padding: 13px 12px;
-  color: #687985;
-  font-size: 8.5px;
-  font-weight: 900;
-  letter-spacing: 0.055em;
-  text-transform: uppercase;
-}
-
 .data-table tbody tr { transition: background 0.12s ease; }
 .data-table tbody tr:hover td, .data-table tbody tr:hover th { background: #f4f9fb; }
 .data-table tbody tr:focus-visible { outline: 2px solid var(--navy); outline-offset: -2px; }
