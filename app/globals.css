@@ -326,13 +326,16 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 
 .fd-metric { padding: 10px 0; border-bottom: 1px solid #eef1f3; }
 
+/* Показатель с отклонением по инструкции: подложка и рамка цвета уровня — те же,
+   что у бейджа рядом со значением. Отрицательные поля вписывают подложку в колонку,
+   не сдвигая сетку (зазор между колонками 28px). */
+.fd-metric.is-flagged { margin: 2px -10px; padding: 10px; border: 1px solid transparent; border-radius: 10px; }
+
 .fd-metric-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 
 .fd-metric-top span { color: #74818a; font-size: 11px; }
 
 .fd-metric-top b { font-size: 14px; font-variant-numeric: tabular-nums; }
-
-.fd-metric-top b.is-alert { color: var(--red); }
 
 /* Полоса — диапазон по типу ВС, точка — этот рейс, штрих — среднее по типу. */
 /* Три дорожки маркеров: аэропорт сверху, значение рейса на полосе, тип ВС снизу.
@@ -349,8 +352,6 @@ h1 { margin:0; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-
 .fd-marker.is-airport { top: 0; color: #7d8e9c; }
 
 .fd-marker.is-flight { top: 12px; }
-
-.fd-marker.is-flight.is-alert { color: var(--red); }
 
 .fd-marker.is-type { top: 25px; opacity: 0.5; }
 

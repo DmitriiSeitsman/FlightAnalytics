@@ -6,7 +6,7 @@ import { COLOR_LABELS, COLOR_STYLES } from "./events-analytics";
 import { classifyEventAll, classifyMetric } from "./deviations/classify";
 import { deviationMatrix } from "./deviations/registry";
 import { DeviationBadge } from "./deviations/badge";
-import { deviationSummary, displayDeviation, LEVEL_STYLES, worstLevel } from "./deviations/presentation";
+import { deviationSummary, displayDeviation, LEVEL_STYLES, worstLevel, type LevelStyle } from "./deviations/presentation";
 
 // Диапазон по типу ВС для этого рейса: минимум, среднее и максимум по каждому показателю.
 // flights — сколько рейсов типа попало в выборку; нужно легенде, чтобы честно сказать,
@@ -26,7 +26,7 @@ interface FlightDetailCardProps {
 // красный только за норматив из матрицы, диапазон — просто контекст.
 // Три дорожки, чтобы силуэты не наезжали друг на друга: вышка аэропорта — над полосой,
 // значение рейса — на самой полосе, среднее по типу ВС — под полосой.
-function MetricRange({ value, min, max, avg, airport, alert }: { value: number; min: number; max: number; avg: number | null; airport: number | null; alert: boolean }) {
+function MetricRange({ value, min, max, avg, airport, accent }: { value: number; min: number; max: number; avg: number | null; airport: number | null; accent: string | null }) {
   const span = max - min;
   if (!(span > 0)) return null;
   const at = (point: number) => Math.min(100, Math.max(0, ((point - min) / span) * 100));
@@ -42,7 +42,7 @@ function MetricRange({ value, min, max, avg, airport, alert }: { value: number; 
       )}
       {outside
         ? <span className={`fd-range-edge${outside === "high" ? " is-high" : ""}`} />
-        : <span className={`fd-marker is-flight${alert ? " is-alert" : ""}`} style={{ left: `${at(value)}%` }}><MarkerGlyph kind="pilot" halo /></span>}
+        : <span className="fd-marker is-flight" style={{ left: `${at(value)}%`, color: accent ?? undefined }}><MarkerGlyph kind="pilot" halo /></span>}
     </div>
   );
 }
@@ -147,7 +147,11 @@ export function FlightDetailCard({ flight, onClose, positions, typeSummary, airp
                 const value = flight.metrics[metric.key];
                 // Предел по показателю рейса — из матрицы нормативов для этого типа ВС.
                 const limit = classifyMetric(metric.key, value, flight.aircraftType, deviationMatrix);
-                const alert = limit !== null && limit.level !== null;
+                // Подсвечиваем только то, что требует внимания: уровень по инструкции или ручную
+                // оценку. «Норматив не применим» и «ниже 2 уровня» карточку не красят.
+                const flagged: LevelStyle | null = limit && (limit.level !== null || limit.reason === "manual-review")
+                  ? displayDeviation(limit).style
+                  : null;
                 const min = typeSummary?.minMetrics[metric.key] ?? null;
                 const max = typeSummary?.maxMetrics[metric.key] ?? null;
                 const avg = typeSummary?.metrics[metric.key] ?? null;
@@ -162,16 +166,21 @@ export function FlightDetailCard({ flight, onClose, positions, typeSummary, airp
                   : null;
                 const hint = [typeHint, airportHint].filter(Boolean).join(" · ") || undefined;
                 return (
-                  <div className="fd-metric" key={metric.key} title={hint}>
+                  <div
+                    className={`fd-metric${flagged ? " is-flagged" : ""}`}
+                    key={metric.key}
+                    title={hint}
+                    style={flagged ? { background: flagged.bg, borderColor: flagged.border } : undefined}
+                  >
                     <div className="fd-metric-top">
                       <span>{metric.label}</span>
                       <span className="fd-metric-value">
-                        {alert && limit && <DeviationBadge display={displayDeviation(limit)} />}
-                        <b className={alert ? "is-alert" : ""}>{formatMetric(value, metric.key, true)}</b>
+                        {flagged && limit && <DeviationBadge display={displayDeviation(limit)} />}
+                        <b style={flagged ? { color: flagged.text } : undefined}>{formatMetric(value, metric.key, true)}</b>
                       </span>
                     </div>
                     {value !== null && min !== null && max !== null && (
-                      <MetricRange value={value} min={min} max={max} avg={avg} airport={airportValue} alert={alert} />
+                      <MetricRange value={value} min={min} max={max} avg={avg} airport={airportValue} accent={flagged?.text ?? null} />
                     )}
                   </div>
                 );
